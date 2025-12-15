@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f77c774f8994ba74f88c86126dbe43ee, type: 3}
+  m_Name: PhotonServerSettings
+  m_EditorClassIdentifier: 
+  AppSettings:
+    AppIdRealtime: 9e4f9b6f-6edc-4e3c-9375-c58bc0cf337c
+    AppIdChat: 
+    AppIdVoice: 
+    AppVersion: 
+    UseNameServer: 1
+    FixedRegion: 
+    Server: 
+    Port: 0
+    Protocol: 0
+    EnableLobbyStatistics: 0
+    NetworkLogging: 1
+  StartInOfflineMode: 0
+  PunLogging: 0
+  EnableSupportLogger: 0
+  RunInBackground: 1
+  RpcList:
+  - DestroySpaceship
+  - Fire
+  - RespawnSpaceship
+  - ReceiveChatMessage
+  - ChatRPC
+  - AssignPartsToAllPlayers
+  - SwitchToCanvas
+  - ChangeScreenForAllPlayers
+  - ChangeScreenAndDisableRoomCanvas
+  - SyncPartControl
+  - ActivatePartForAll
+  - EnablePart
+  - ActivatePartOnAllClients
+  - AssignPartToPlayer
+  - ActivatePart
+  - ActivatePartRPC
+  - SyncLine
+  DisableAutoOpenWizard: 1
+  ShowSettings: 1
