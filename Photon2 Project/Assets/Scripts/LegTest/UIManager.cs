@@ -66,6 +66,19 @@ public class UIManager : MonoBehaviour
             var robotObj = runner.Spawn(RobotPrefab, new Vector3(-11, 4, 0), Quaternion.identity);
             NetworkRobot = robotObj;
             pelvis = robotObj.transform.Find("MainPelvis");
+            if (pelvis == null)
+            {
+                Debug.LogError("Robot 프리팹 루트 밑에 'MainPelvis' 자식을 찾지 못했습니다. 프리팹 구조를 확인해주세요.");
+                return;
+            }
+
+            var bodyController = pelvis.GetComponent<BodyController>();
+            if (bodyController.sholderL == null || bodyController.sholderR == null || bodyController.pelvisL == null || bodyController.pelvisR == null)
+            {
+                Debug.LogError("BodyController의 sholderL/sholderR/pelvisL/pelvisR 앵커가 Robot 프리팹 Inspector에서 연결되지 않았습니다.");
+                return;
+            }
+
             pelvis.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
 
             // 4명의 접속 플레이어에게 사지를 1:1로 배정한다 (스폰 시점에 InputAuthority 지정)
@@ -76,13 +89,14 @@ public class UIManager : MonoBehaviour
             leftArm = SpawnLimb(runner, LeftArmPrefab, new Vector3(-1.5f, 4.2f, 0), players, 2);
             rightArm = SpawnLimb(runner, RightArmPrefab, new Vector3(1.5f, 4.2f, 0), players, 3);
 
-            leftArm.GetComponent<ArmManager>().sholder = pelvis.Find("Sholder L").gameObject;
-            rightArm.GetComponent<ArmManager>().sholder = pelvis.Find("Sholder R").gameObject;
-            leftLeg.GetComponent<LegManager>().pelvis = pelvis.Find("pelvisL").gameObject;
-            rightLeg.GetComponent<LegManager>().pelvis = pelvis.Find("pelvisR").gameObject;
+            // 이름으로 찾지 않고, Robot 프리팹에 미리 연결해둔 앵커를 그대로 사용한다.
+            leftArm.GetComponent<ArmManager>().sholder = bodyController.sholderL;
+            rightArm.GetComponent<ArmManager>().sholder = bodyController.sholderR;
+            leftLeg.GetComponent<LegManager>().pelvis = bodyController.pelvisL;
+            rightLeg.GetComponent<LegManager>().pelvis = bodyController.pelvisR;
 
-            pelvis.GetComponent<BodyController>().LeftLeg = leftLeg.GetComponent<LegManager>();
-            pelvis.GetComponent<BodyController>().RightLeg = rightLeg.GetComponent<LegManager>();
+            bodyController.LeftLeg = leftLeg.GetComponent<LegManager>();
+            bodyController.RightLeg = rightLeg.GetComponent<LegManager>();
 
             isrobot = true;
         }

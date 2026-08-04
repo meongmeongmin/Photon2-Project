@@ -7,11 +7,15 @@ using UnityEngine.AI;
 public class BodyController : NetworkBehaviour
 {
     [Header("Objects")]
-    [SerializeField] GameObject body;
+    //[SerializeField] GameObject body;
     public LegManager LeftLeg;
     public LegManager RightLeg;
-    [SerializeField] GameObject pelvisL;
-    [SerializeField] GameObject pelvisR;
+
+    [Header("Limb Anchors (Robot 프리팹에서 직접 연결, 이름으로 찾지 않음)")]
+    public GameObject sholderL;
+    public GameObject sholderR;
+    public GameObject pelvisL;
+    public GameObject pelvisR;
 
     [Header("isGrounded")]
     [SerializeField] bool leftFootGrounded;

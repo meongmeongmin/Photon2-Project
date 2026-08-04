@@ -54,7 +54,7 @@ public class LegManager : NetworkBehaviour
     // Update is called once per frame
     void Update()
     {
-        Vector2 pkdis = pelvis.transform.position - foot.transform.position;
+        Vector2 pkdis = ((Vector2)pelvis.transform.position - (Vector2)foot.transform.position);
         pf_dis = Vector2.SqrMagnitude(pkdis);
         pf_center.position = (pelvis.transform.position + foot.transform.position)/2;
 
