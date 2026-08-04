@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using Fusion;
 using UnityEngine;
-using Photon.Pun;
 
-public class ArmManager : MonoBehaviour
+public class ArmManager : NetworkBehaviour
 {
     // Start is called before the first frame update
     [Header("Objects")]
@@ -19,94 +19,70 @@ public class ArmManager : MonoBehaviour
     [SerializeField] float knee_dis;
     [SerializeField] float max_dis;
 
-    [Header("MousePos")]
-    MousePos getMousePos;
-    public Transform mousePos;
-    PhotonView photonView;
+    Vector2 mouseWorldPos;
     [Header("LineLenderer")]
     Vector3[] lenderVec;
     void Start()
     {
         lenderVec = new Vector3[] { sholder.transform.position, elbow.transform.position, hand.transform.position };
 
-        photonView = GetComponent<PhotonView>();
-        //getMousePos = mousePos.GetComponent<MousePos>();
         this.GetComponent<LineRenderer>().positionCount = lenderVec.Length;
 
         max_dis = 25f;
     }
 
+    public override void FixedUpdateNetwork()
+    {
+        if (!Object.HasStateAuthority) return;
+        if (!GetInput(out NetworkInputData data)) return;
+
+        mouseWorldPos = data.MouseWorldPos;
+
+        //Ìò∏Ïä§Ìä∏Îßå Ïã§Ï†úÎ°ú ÏÜê/ÌåîÍøàÏπò Î™©Ìëú ÏúÑÏπòÎ•º Í≥ÑÏÇ∞Ìï¥ÏÑú ÏòÆÍ∏¥Îã§
+        footLookMouse();
+    }
+
     // Update is called once per frame
     void Update()
     {
-
-        if (photonView.IsMine == false) return;
-        //this.mousePos.position = getMousePos.mousePos;
-        //º’¿Ã æÓ±˙¿« ∆Ø¡§∞≈∏Æ ¿ÃªÛ π˛æÓ≥™¡ˆ æ µµ∑œ
-        //π´∏®¿Ã º’∞˙ æÓ±˙¿« ∞≈∏Æø° µ˚∂Û æ’¿∏∑Œ ¡¢»˜µµ∑œ
-        //º’¿Ã æÓ±˙∞˙¿« ∞¢µµ ¡¶«—
-        //∞°ªÛ ∆»≤ﬁƒ° ¿ßƒ°
         Vector2 pkdis = sholder.transform.position - hand.transform.position;
         pf_dis = Vector2.SqrMagnitude(pkdis);
         pf_center.position = (sholder.transform.position + hand.transform.position) / 2;
 
-        //∞°ªÛ∆»≤ﬁƒ°∞˙ æÓ±˙∞˙ º’¿« ¿ßƒ°ø° µ˚∏• ∆»≤ﬁƒ° ¿ßƒ°∫Ø»≠
-        float dis = (max_dis - pf_dis) / 5; //∆˜¡ˆº«∞˙ ∞≈∏Æ¿« ¬˜¿Ã∞° 5¿Ã±‚ø° ¿Ã∑∏∞‘ «‘.
+        //Ïñ¥Íπ®-ÏÜê Ï§ëÏã¨ Î∞©Ìñ•ÏúºÎ°ú ÌåîÍøàÏπò ÏúÑÏπò Í∞±Ïã†
+        float dis = (max_dis - pf_dis) / 5;
         elbow.transform.localPosition = new Vector2(-(dis / 2f), 0);
 
         knee_dis = max_dis - pf_dis;
-        //ø™∞¸¿˝æ»µ«µµ∑œ
+        //Î∞òÎåÄÌé∏ÏúºÎ°ú ÎÑòÏñ¥Í∞ÄÏßÄ ÏïäÎèÑÎ°ù
         if (elbow.transform.localPosition.x > 0)
         {
             elbow.transform.position = pf_center.position;
         }
-        //∞°ªÛ∆»≤ﬁƒ°¿Ã º’¿ª √≥¥Ÿ∫∏µµ∑œ
+        //Ïñ¥Íπ®-ÏÜê Ï§ëÏã¨ Î∞©Ìñ•ÏúºÎ°ú ÌöåÏ†Ñ
         Vector2 pf_centerDir = pf_center.position - hand.transform.position;
         float dir = Mathf.Atan2(pf_centerDir.y, pf_centerDir.x) * Mathf.Rad2Deg + 270f;
         pf_center.rotation = Quaternion.Euler(new Vector3(0, 0, dir));
-        //∞°ªÛ ∆»≤ﬁƒ°¿« ¿⁄Ωƒ¿∏∑Œ ∆»≤ﬁƒ°¿Ã µÈæÓ∞° ¿÷¿∏π«∑Œ ∞¢µµ ºˆ¡§¿∫ X
-        //knee.transform.rotation = pf_center.transform.rotation;
 
-        //º’¿Ã ∏∂øÏΩ∫∏¶ √ƒ¥Ÿ∫∏µµ∑œ
-        footLookMouse();
-        //lineRanderer ( ¿”Ω√ )
-        //this.GetComponent<LineRenderer>().SetPosition(0, sholder.transform.position);
-        //this.GetComponent<LineRenderer>().SetPosition(1, elbow.transform.position);
-        //this.GetComponent<LineRenderer>().SetPosition(2, hand.transform.position);
         lenderVec = new Vector3[] { sholder.transform.position, elbow.transform.position, hand.transform.position };
-        //DrawLineLender();
         HandLookElbow();
 
     }
-    void DrawLineLender()
-    {
-        object[] serializedPoints = new object[lenderVec.Length];
-        this.GetComponent<LineRenderer>().SetPositions(lenderVec);
-        for (int i = 0; i < lenderVec.Length; i++)
-        {
-            serializedPoints[i] = lenderVec[i];
-
-        }
-        photonView.RPC("SyncLine", RpcTarget.Others, serializedPoints);
-    }
     void footLookMouse()
     {
-        //∏∂øÏΩ∫øÕ æÓ±˙¿« ∞≈∏Æ
-        Vector2 pm_dir = sholder.transform.position - mousePos.position;
+        //ÎßàÏö∞Ïä§ÏôÄÏùò Í±∞Î¶¨
+        Vector2 pm_dir = (Vector2)sholder.transform.position - mouseWorldPos;
         float pmdis = Vector2.SqrMagnitude(pm_dir);
-        //º’¿Ã ∏∂øÏΩ∫ µ˚∂Û∞°±‚ π◊ πŸ∂Û∫∏±‚ maxdis∑Œ ¡¶«—«œ±‚.
-        if (pmdis < max_dis) //µ˚∂Û∞°±‚
+        //ÏµúÎåÄÍ±∞Î¶¨ Ïù¥ÏÉÅÏù¥Î©¥ Îî∞ÎùºÍ∞ÄÏßÄ ÏïäÍ≥† Î∞©Ìñ•Îßå clamp
+        if (pmdis < max_dis) //Îî∞ÎùºÍ∞ÄÍ∏∞
         {
-            hand.transform.position = mousePos.position;
+            hand.transform.position = mouseWorldPos;
         }
-        else //πŸ∂Û∫∏±‚ º’¿Ã πŸ∂Û∫∏¥¬±∏≥™, æÓ±˙¿ª ¡ﬂΩ…¿∏∑Œ πŸ∂Û∫∏∞‘ «œ∑¡∏È?
+        else //ÏµúÎåÄÍ±∞Î¶¨ Ïù¥ÏÉÅÏù¥Î©¥ Î∞©Ìñ•Îßå Îî∞ÎùºÍ∞ÄÍ≥† Í±∞Î¶¨Îäî clamp
         {
-            //Vector2 fm_dir = foot.transform.position - mousePos.position;
-            //float dir = Mathf.Atan2(fm_dir.y, fm_dir.x) * Mathf.Rad2Deg;
-            //foot.transform.rotation = Quaternion.Euler(new Vector3(0, 0, dir));
-            hand.transform.position = mousePos.position;
+            hand.transform.position = mouseWorldPos;
             Vector2 fp_dir = hand.transform.position - sholder.transform.position;
-            Vector2 clampedPosition = sholder.transform.position + (Vector3)(fp_dir.normalized * 5); //*∏¶ «œ∏È ∆Ì«œ±∏≥™
+            Vector2 clampedPosition = sholder.transform.position + (Vector3)(fp_dir.normalized * 5);
             hand.transform.position = clampedPosition;
         }
 
@@ -116,28 +92,13 @@ public class ArmManager : MonoBehaviour
         Vector2 direction = (elbow.transform.position - hand.transform.position).normalized;
         hand.transform.up = direction;
 
-        //Vector2 direction2 = (sholder.transform.position - elbow.transform.position).normalized;
-        //elbow.transform.up = direction;
         Vector2 worldDirection = (sholder.transform.position - elbow.transform.position).normalized;
 
-        // ∫Œ∏ ±‚¡ÿ¿« ∑Œƒ√ πÊ«‚¿∏∑Œ ∫Ø»Ø
+        // Î∂ÄÎ™® Í∏∞Ï§ÄÏùò Î°úÏª¨ Î∞©Ìñ•ÏúºÎ°ú Î≥ÄÌôò
         Vector2 localDirection = pf_center.InverseTransformDirection(worldDirection);
 
-        // ¿⁄Ωƒ¿« ∑Œƒ√ up¿Ã ≈∏∞Ÿ¿ª «‚«œ∞‘ «‘
+        // ÏûêÏãùÏùò Î°úÏª¨ upÏù¥ ÌÉÄÍ≤üÏùÑ Ìñ•ÌïòÍ≤å Ìï®
         elbow.transform.localRotation = Quaternion.FromToRotation(Vector3.up, localDirection);
 
     }
-    [PunRPC]
-    void SyncLine(object[] serializedPoints)
-    {
-        Vector3[] points = new Vector3[serializedPoints.Length];
-        for (int i = 0; i < points.Length; i++)
-            points[i] = (Vector3)serializedPoints[i];
-
-        this.GetComponent<LineRenderer>().positionCount = points.Length;
-        this.GetComponent<LineRenderer>().SetPositions(points);
-
-
-    }
-
 }

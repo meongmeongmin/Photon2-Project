@@ -1,13 +1,14 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Photon.Pun;
-using Photon.Realtime;
+using Fusion;
 using UnityEngine.UI;
 
 
-public class Chatting : MonoBehaviourPunCallbacks
+public class Chatting : MonoBehaviour
 {
+    public static Chatting Instance;
+
     [Header("DisconnectPanel")]
     public InputField NickNameInput;
 
@@ -28,10 +29,15 @@ public class Chatting : MonoBehaviourPunCallbacks
 
     [Header("ETC")]
     public Text StatusText;
-    public PhotonView PV;
 
-    List<RoomInfo> myList = new List<RoomInfo>();
+    string localNickName;
+    List<SessionInfo> myList = new List<SessionInfo>();
     int currentPage = 1, maxPage, multiple;
+
+    void Awake()
+    {
+        Instance = this;
+    }
 
 
     #region 방리스트 갱신
@@ -40,7 +46,7 @@ public class Chatting : MonoBehaviourPunCallbacks
     {
         if (num == -2) --currentPage;
         else if (num == -1) ++currentPage;
-        else PhotonNetwork.JoinRoom(myList[multiple + num].Name);
+        else NetworkManager.Instance.JoinRoomByName(myList[multiple + num].Name);
         MyListRenewal();
     }
 
@@ -63,74 +69,78 @@ public class Chatting : MonoBehaviourPunCallbacks
         }
     }
 
-    public override void OnRoomListUpdate(List<RoomInfo> roomList)
+    // NetworkManager.OnSessionListUpdated에서 매 프레임 최신 목록을 들고 있으므로 여기서는 폴링만 한다
+    void Update()
     {
-        int roomCount = roomList.Count;
-        for (int i = 0; i < roomCount; i++)
+        if (StatusText != null)
+            StatusText.text = NetworkManager.Runner != null ? NetworkManager.Runner.State.ToString() : "Disconnected";
+
+        if (!SessionListEquals(myList, NetworkManager.LastSessionList))
         {
-            if (!roomList[i].RemovedFromList)
-            {
-                if (!myList.Contains(roomList[i])) myList.Add(roomList[i]);
-                else myList[myList.IndexOf(roomList[i])] = roomList[i];
-            }
-            else if (myList.IndexOf(roomList[i]) != -1) myList.RemoveAt(myList.IndexOf(roomList[i]));
+            myList = new List<SessionInfo>(NetworkManager.LastSessionList);
+            MyListRenewal();
         }
-        MyListRenewal();
+
+        if (LobbyInfoText != null && NetworkManager.Runner != null)
+            LobbyInfoText.text = myList.Count + "개 방";
+    }
+
+    bool SessionListEquals(List<SessionInfo> a, List<SessionInfo> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (int i = 0; i < a.Count; i++)
+            if (a[i].Name != b[i].Name || a[i].PlayerCount != b[i].PlayerCount) return false;
+        return true;
     }
     #endregion
 
 
     #region 서버연결
-    void Awake() => Screen.SetResolution(960, 540, false);
+    void Start() => Screen.SetResolution(960, 540, false);
 
-    void Update()
-    {
-        if (StatusText != null)
-            StatusText.text = PhotonNetwork.NetworkClientState.ToString();
-        if (LobbyInfoText != null)
-            LobbyInfoText.text = (PhotonNetwork.CountOfPlayers - PhotonNetwork.CountOfPlayersInRooms) + "로비 / " + PhotonNetwork.CountOfPlayers + "접속";
-    }
+    public void Connect() => NetworkManager.Instance.JoinLobby();
 
-    public void Connect() => PhotonNetwork.ConnectUsingSettings();
-
-    public override void OnConnectedToMaster() => PhotonNetwork.JoinLobby();
-
-    public override void OnJoinedLobby()
+    public void HandleJoinedLobby()
     {
         Debug.Log("서버접속완료");
         LobbyPanel.SetActive(true);
         RoomPanel.SetActive(false);
-        //닉네임 
-        PhotonNetwork.LocalPlayer.NickName = "Player" + Random.Range(1, 100);
-        WelcomeText.text = PhotonNetwork.LocalPlayer.NickName + "님 환영합니다";
+        //닉네임
+        localNickName = "Player" + Random.Range(1, 100);
+        WelcomeText.text = localNickName + "님 환영합니다";
         myList.Clear();
     }
 
-    public void Disconnect() => PhotonNetwork.Disconnect();
-
-    public override void OnDisconnected(DisconnectCause cause)
-    {
-        LobbyPanel.SetActive(false);
-        RoomPanel.SetActive(false);
-    }
+    public void Disconnect() => NetworkManager.Instance.LeaveLobby();
     #endregion
 
 
     #region 방
 
     public string defaultRoomName;
-    public void CreateRoom()
+    public async void CreateRoom()
     {
         // 1부터 99까지의 랜덤 숫자를 생성하여 방 이름을 만듭니다.
         defaultRoomName = "Room" + Random.Range(1, 100);
-        PhotonNetwork.CreateRoom(defaultRoomName, new RoomOptions { MaxPlayers = 4 });
+        var runner = NetworkManager.Instance.EnsureRunner();
+        var result = await runner.StartGame(new StartGameArgs
+        {
+            GameMode = GameMode.Host,
+            SessionName = defaultRoomName,
+            PlayerCount = 4,
+        });
+        if (result.Ok)
+        {
+            NetworkManager.Instance.SpawnSessionRpcIfHost(runner);
+            HandleJoinedRoom();
+        }
     }
 
-    public void JoinRandomRoom() => PhotonNetwork.JoinRandomRoom();
+    public void JoinRandomRoom() => NetworkManager.Instance.JoinRandomRoom();
 
-    public void LeaveRoom() => PhotonNetwork.LeaveRoom();
+    public void LeaveRoom() => NetworkManager.Instance.LeaveRoom();
 
-    public override void OnJoinedRoom()
+    public void HandleJoinedRoom()
     {
         RoomPanel.SetActive(true);
         RoomRenewal();
@@ -139,24 +149,33 @@ public class Chatting : MonoBehaviourPunCallbacks
     }
 
 
-    public override void OnPlayerEnteredRoom(Player newPlayer)
+    public void HandlePlayerJoined(NetworkRunner runner, PlayerRef newPlayer)
     {
         RoomRenewal();
-        ChatRPC("<color=yellow>" + newPlayer.NickName + "님이 참가하셨습니다</color>");
+        if (newPlayer != runner.LocalPlayer)
+            SessionRpc.Instance?.RPC_Chat("<color=yellow>Player" + newPlayer.PlayerId + "님이 참가하셨습니다</color>");
     }
 
-    public override void OnPlayerLeftRoom(Player otherPlayer)
+    public void HandlePlayerLeft(NetworkRunner runner, PlayerRef otherPlayer)
     {
         RoomRenewal();
-        ChatRPC("<color=yellow>" + otherPlayer.NickName + "님이 퇴장하셨습니다</color>");
+        SessionRpc.Instance?.RPC_Chat("<color=yellow>Player" + otherPlayer.PlayerId + "님이 퇴장하셨습니다</color>");
     }
 
     void RoomRenewal()
     {
+        if (NetworkManager.Runner == null || !NetworkManager.Runner.IsRunning) return;
+
         ListText.text = "";
-        for (int i = 0; i < PhotonNetwork.PlayerList.Length; i++)
-            ListText.text += PhotonNetwork.PlayerList[i].NickName + ((i + 1 == PhotonNetwork.PlayerList.Length) ? "" : ", ");
-        RoomInfoText.text = PhotonNetwork.CurrentRoom.Name + " / " + PhotonNetwork.CurrentRoom.PlayerCount + "명 / " + PhotonNetwork.CurrentRoom.MaxPlayers + "최대";
+        var players = NetworkManager.Runner.ActivePlayers;
+        int count = 0;
+        foreach (var p in players) count++;
+        int idx = 0;
+        foreach (var p in players)
+        {
+            ListText.text += "Player" + p.PlayerId + ((++idx == count) ? "" : ", ");
+        }
+        RoomInfoText.text = NetworkManager.Runner.SessionInfo.Name + " / " + NetworkManager.Runner.SessionInfo.PlayerCount + "명 / " + NetworkManager.Runner.SessionInfo.MaxPlayers + "최대";
     }
     #endregion
 
@@ -164,12 +183,11 @@ public class Chatting : MonoBehaviourPunCallbacks
     #region 채팅
     public void Send()
     {
-        PV.RPC("ChatRPC", RpcTarget.All, PhotonNetwork.NickName + " : " + ChatInput.text);
+        SessionRpc.Instance?.RPC_Chat(localNickName + " : " + ChatInput.text);
         ChatInput.text = "";
     }
 
-    [PunRPC] // RPC는 플레이어가 속해있는 방 모든 인원에게 전달한다
-    void ChatRPC(string msg)
+    public void OnChatMessage(string msg)
     {
         bool isInput = false;
         for (int i = 0; i < ChatText.Length; i++)

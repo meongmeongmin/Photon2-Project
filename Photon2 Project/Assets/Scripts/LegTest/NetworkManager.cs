@@ -1,20 +1,25 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Fusion;
+using Fusion.Sockets;
 using UnityEngine;
-using Photon.Pun;
-using Photon.Realtime;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 
-public class NetworkManager : MonoBehaviourPunCallbacks
+public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 {
     public Text StatusText;
     public InputField roomInput;
+    [Header("Session-wide RPC relay (chat, screen change, ...)")]
+    public NetworkObject SessionRpcPrefab;
 
-    void Start()
+    public static NetworkManager Instance { get; private set; }
+    public static NetworkRunner Runner { get; private set; }
+    public static List<SessionInfo> LastSessionList { get; private set; } = new List<SessionInfo>();
+
+    void Awake()
     {
-        Screen.SetResolution(960, 540, false); // false = 전체화면x
-        PhotonNetwork.GameVersion = "1.0";  // 게임 버전 설정
+        Instance = this;
     }
 
     void Update()
@@ -22,36 +27,47 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         // 네트워크 상태 표시
         if (StatusText != null)
         {
-            StatusText.text = PhotonNetwork.NetworkClientState.ToString();
+            StatusText.text = Runner != null ? Runner.State.ToString() : "Disconnected";
         }
     }
 
-    // 서버 접속후 함수
-    public override void OnConnectedToMaster()
+    public NetworkRunner EnsureRunner()
     {
-        Debug.Log("서버접속완료");
+        if (Runner == null)
+        {
+            Runner = gameObject.AddComponent<NetworkRunner>();
+            Runner.ProvideInput = true;
+            Runner.AddCallbacks(this);
+        }
+        return Runner;
     }
 
-    public void JoinLobby() => PhotonNetwork.JoinLobby();
-
-    public override void OnJoinedLobby()
+    public void SpawnSessionRpcIfHost(NetworkRunner runner)
     {
-        print("로비접속완료");
+        if (runner.IsServer && SessionRpcPrefab != null && SessionRpc.Instance == null)
+        {
+            runner.Spawn(SessionRpcPrefab);
+        }
     }
 
-    public void LeaveLobby() => PhotonNetwork.LeaveLobby();
-
-    public override void OnLeftLobby()
+    public async void JoinLobby()
     {
-        print("로비 나가기 완료");
+        var runner = EnsureRunner();
+        await runner.JoinSessionLobby(SessionLobby.ClientServer);
+        Chatting.Instance?.HandleJoinedLobby();
+    }
+
+    public void LeaveLobby()
+    {
+        if (Runner != null) Runner.Shutdown();
     }
 
     // 임시 테스트용
     public void DisconnectFromServer()
     {
-        if (PhotonNetwork.IsConnected)
+        if (Runner != null)
         {
-            PhotonNetwork.Disconnect();
+            Runner.Shutdown();
             Debug.Log("서버 연결을 끊었습니다.");
         }
         else
@@ -60,21 +76,39 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
     }
 
-    public void CreateRoom()
+    public async void CreateRoom()
     {
-        int roomCount = PhotonNetwork.CountOfRooms;
+        int roomCount = LastSessionList.Count;
         string defaultRoomName = "Room" + (roomCount + 1);
 
-        PhotonNetwork.CreateRoom(defaultRoomName, new RoomOptions { MaxPlayers = 5 });
-        Debug.Log($"방생성완료. 방 이름: {defaultRoomName}");
+        var runner = EnsureRunner();
+        var result = await runner.StartGame(new StartGameArgs
+        {
+            GameMode = GameMode.Host,
+            SessionName = defaultRoomName,
+            PlayerCount = 5,
+        });
+        Debug.Log(result.Ok ? $"방생성완료. 방 이름: {defaultRoomName}" : $"방생성실패: {result.ShutdownReason}");
+        if (result.Ok)
+        {
+            SpawnSessionRpcIfHost(runner);
+            Chatting.Instance?.HandleJoinedRoom();
+        }
     }
 
     // 친구와 플레이 (방 코드입력)
-    public void JoinRoom()
+    public async void JoinRoom()
     {
         if (roomInput != null && !string.IsNullOrEmpty(roomInput.text))
         {
-            PhotonNetwork.JoinRoom(roomInput.text);
+            var runner = EnsureRunner();
+            var result = await runner.StartGame(new StartGameArgs
+            {
+                GameMode = GameMode.Client,
+                SessionName = roomInput.text,
+            });
+            if (!result.Ok) Debug.LogWarning($"방참가실패: {result.ShutdownReason}");
+            else Chatting.Instance?.HandleJoinedRoom();
         }
         else
         {
@@ -82,11 +116,23 @@ public class NetworkManager : MonoBehaviourPunCallbacks
         }
     }
 
+    public async void JoinRoomByName(string sessionName)
+    {
+        var runner = EnsureRunner();
+        var result = await runner.StartGame(new StartGameArgs
+        {
+            GameMode = GameMode.Client,
+            SessionName = sessionName,
+        });
+        if (!result.Ok) Debug.LogWarning($"방참가실패: {result.ShutdownReason}");
+        else Chatting.Instance?.HandleJoinedRoom();
+    }
+
     public void ExitGame()
     {
-        if (PhotonNetwork.IsConnected)
+        if (Runner != null)
         {
-            PhotonNetwork.Disconnect();
+            Runner.Shutdown();
             Debug.Log("서버 연결을 끊었습니다.");
         }
 
@@ -96,67 +142,90 @@ public class NetworkManager : MonoBehaviourPunCallbacks
 
     void OnApplicationQuit()
     {
-        if (PhotonNetwork.IsConnected)
+        if (Runner != null)
         {
-            PhotonNetwork.Disconnect();
+            Runner.Shutdown();
             Debug.Log("강제 종료 - 서버 연결을 끊었습니다.");
         }
-
-        Debug.Log("게임이 강제 종료되었습니다.");
     }
 
-    public void JoinRandomRoom() => PhotonNetwork.JoinRandomRoom();
-
-    public void LeaveRoom() => PhotonNetwork.LeaveRoom();
-
-    public override void OnCreatedRoom()
+    public async void JoinRandomRoom()
     {
-        print("방만들기완료");
+        var runner = EnsureRunner();
+        if (LastSessionList.Count == 0)
+        {
+            Debug.LogWarning("참가 가능한 방이 없습니다.");
+            return;
+        }
+        var session = LastSessionList[UnityEngine.Random.Range(0, LastSessionList.Count)];
+        var result = await runner.StartGame(new StartGameArgs
+        {
+            GameMode = GameMode.Client,
+            SessionName = session.Name,
+        });
+        if (!result.Ok) Debug.LogWarning($"방참가실패: {result.ShutdownReason}");
+        else Chatting.Instance?.HandleJoinedRoom();
     }
 
-    public override void OnJoinedRoom()
+    public void LeaveRoom()
     {
-        print("방참가완료");
-    }
-
-    public override void OnCreateRoomFailed(short returnCode, string message)
-    {
-        print($"방만들기실패: {message}");
-    }
-
-    public override void OnJoinRoomFailed(short returnCode, string message)
-    {
-        print($"방참가실패: {message}");
-    }
-
-    public override void OnJoinRandomFailed(short returnCode, string message)
-    {
-        Debug.Log($"방 참가 실패: {message}");
+        if (Runner != null) Runner.Shutdown();
     }
 
     [ContextMenu("정보")]
     void Info()
     {
-        if (PhotonNetwork.InRoom)
+        if (Runner != null && Runner.IsRunning)
         {
-            print("현재 방 이름 : " + PhotonNetwork.CurrentRoom.Name);
-            print("현재 방 인원수 : " + PhotonNetwork.CurrentRoom.PlayerCount);
-            print("현재 방 최대인원수 : " + PhotonNetwork.CurrentRoom.MaxPlayers);
-
-            string playerStr = "방에 있는 플레이어 목록 : ";
-            foreach (var player in PhotonNetwork.PlayerList)
-            {
-                playerStr += player.NickName + ", ";
-            }
-            print(playerStr);
+            print("현재 방 이름 : " + Runner.SessionInfo.Name);
+            print("현재 방 인원수 : " + Runner.SessionInfo.PlayerCount);
+            print("현재 방 최대인원수 : " + Runner.SessionInfo.MaxPlayers);
         }
         else
         {
-            print("접속한 인원 수 : " + PhotonNetwork.CountOfPlayers);
-            print("방 개수 : " + PhotonNetwork.CountOfRooms);
-            print("모든 방에 있는 인원 수 : " + PhotonNetwork.CountOfPlayersInRooms);
-            print("로비에 있는지? : " + PhotonNetwork.InLobby);
-            print("연결됐는지? : " + PhotonNetwork.IsConnected);
+            print("방 개수 : " + LastSessionList.Count);
         }
     }
+
+    #region INetworkRunnerCallbacks
+
+    public void OnInput(NetworkRunner runner, NetworkInput input)
+    {
+        var data = new NetworkInputData();
+        if (Camera.main != null)
+        {
+            Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(UnityEngine.Input.mousePosition);
+            data.MouseWorldPos = mouseWorld;
+        }
+        input.Set(data);
+    }
+
+    public void OnSessionListUpdated(NetworkRunner runner, List<SessionInfo> sessionList)
+    {
+        LastSessionList = sessionList;
+    }
+
+    public void OnConnectedToServer(NetworkRunner runner)
+    {
+        Debug.Log("서버접속완료");
+    }
+
+    public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) => Chatting.Instance?.HandlePlayerJoined(runner, player);
+    public void OnPlayerLeft(NetworkRunner runner, PlayerRef player) => Chatting.Instance?.HandlePlayerLeft(runner, player);
+    public void OnInputMissing(NetworkRunner runner, PlayerRef player, NetworkInput input) { }
+    public void OnShutdown(NetworkRunner runner, ShutdownReason shutdownReason) { }
+    public void OnDisconnectedFromServer(NetworkRunner runner, NetDisconnectReason reason) { }
+    public void OnConnectRequest(NetworkRunner runner, NetworkRunnerCallbackArgs.ConnectRequest request, byte[] token) { }
+    public void OnConnectFailed(NetworkRunner runner, NetAddress remoteAddress, NetConnectFailedReason reason) { }
+    public void OnUserSimulationMessage(NetworkRunner runner, SimulationMessagePtr message) { }
+    public void OnCustomAuthenticationResponse(NetworkRunner runner, Dictionary<string, object> data) { }
+    public void OnHostMigration(NetworkRunner runner, HostMigrationToken hostMigrationToken) { }
+    public void OnSceneLoadDone(NetworkRunner runner) { }
+    public void OnSceneLoadStart(NetworkRunner runner) { }
+    public void OnObjectExitAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
+    public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
+    public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ReadOnlySpan<byte> data) { }
+    public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
+
+    #endregion
 }

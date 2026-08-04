@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
+using Fusion;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class BodyController : MonoBehaviour
+public class BodyController : NetworkBehaviour
 {
     [Header("Objects")]
     [SerializeField] GameObject body;
@@ -23,42 +23,33 @@ public class BodyController : MonoBehaviour
     [Header("PelvisChildPos")]
     [SerializeField] Vector3 pelvisL_ChildPos;
     [SerializeField] Vector3 pelvisR_ChildPos;
-    // Start is called before the first frame update
-    private void Awake()
-    {
-        
-    }
-    void Start()
-    {
 
-    }
-
-    // Update is called once per frame
-    void Update()
+    public override void FixedUpdateNetwork()
     {
+        if (!Object.HasStateAuthority) return; //ê³µìœ  ëª¸í†µ ë¬¼ë¦¬ëŠ” í˜¸ìŠ¤íŠ¸ë§Œ ì‹œë®¬ë ˆì´ì…˜í•œë‹¤
+
         leftFootGrounded = LeftLeg.isGround;
         rightFootGrounded = RightLeg.isGround;
 
         isFootsGrounded = (leftFootGrounded || rightFootGrounded);
-        if(isFootsGrounded == true) //¹ßÀÌ ÇÏ³ª¶óµµ ´ê¾Æ ÀÖÀ»¶§
+        if(isFootsGrounded == true) //ë‘˜ ì¤‘ í•˜ë‚˜ë¼ë„ ì ‘ì§€ëœ ìƒíƒœ
         {
             this.GetComponent<Rigidbody2D>().gravityScale = 0;
-            this.GetComponent<Rigidbody2D>().velocity = Vector2.zero;
-            Vector3 newPosition = this.transform.position; // CÀÇ »õ·Î¿î À§Ä¡¸¦ °è»ê
+            this.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
+            Vector3 newPosition = this.transform.position; // Cì˜ ë‹¤ìŒ ìœ„ì¹˜ë¥¼ ê³„ì‚°
 
-            // Å° ÀÔ·Â µîÀ» ÅëÇØ CÀÇ ÀÌµ¿ ¹æÇâÀ» °áÁ¤
+            // í‚¤ ì…ë ¥ì— ë”°ë¼ Cê°€ ì´ë™í•  ë°©í–¥ì„ ê²°ì •
             float x = Input.GetAxisRaw("Horizontal");
             float y = Input.GetAxisRaw("Vertical");
 
             if (x !=0 || y != 0)
             {
-                newPosition += new Vector3(x, y, 0) * speed * Time.deltaTime;
+                newPosition += new Vector3(x, y, 0) * speed * Runner.DeltaTime;
 
-                // ÇÕÁıÇÕ ¿µ¿ª ³»¿¡ ÀÖ´ÂÁö È®ÀÎ ÀÌ ¾È¿¡ ÀÖÀ»¶§¸¸ ÀÌµ¿ °¡´É ÇÏÁö¸¸ ºÎµå·´°Ô ¿òÁ÷ÀÌ·Á¸é?
+                // ê³„ì‚°ëœ ìœ„ì¹˜ê°€ ì› ì•ˆì— ìˆëŠ”ì§€ í™•ì¸ í›„ ì•ˆì— ìˆìœ¼ë©´ ì´ë™, ë°–ì— ìˆìœ¼ë©´ ê²½ê³„ë¡œ í´ë¨í”„
                 if (IsInUnion(newPosition, LeftLeg.foot.transform.position, radius, RightLeg.foot.transform.position, radius))
                 {
-                    //¿òÁ÷ÀÓÀ» Á¦¾îÇÏ´Â°ÍÀÌ ¾Æ´Ï¶ó Á¦¾î ÇÑ ÈÄ¿¡ À§Ä¡¸¦ ³Ö¾îÁØ´Ù.
-                    this.transform.position = newPosition; // À¯È¿ÇÑ À§Ä¡·Î C¸¦ ÀÌµ¿
+                    this.transform.position = newPosition;
                 }
                 else
                 {
@@ -68,16 +59,10 @@ public class BodyController : MonoBehaviour
             }
         }
 
-        if (isFootsGrounded == false) //¹ßÀÌ ÇÏ³ªµµ ´êÁö ¾Ê¾ÒÀ»¶§
+        if (isFootsGrounded == false) //ë‘˜ ë‹¤ ì ‘ì§€ë˜ì§€ ì•Šì•˜ìœ¼ë©´
         {
             this.GetComponent<Rigidbody2D>().gravityScale = 1;
         }
-
-        //SetLegParents(0,LeftLeg.transform, LeftLeg.transform.Find("pf_Center").Find("knee"), LeftLeg.transform.transform.Find("foot"));
-        //SetLegParents(3,RightLeg.transform, RightLeg.transform.Find("pf_Center").Find("knee"), LeftLeg.transform.transform.Find("foot"));
-        //SetLegParents(pelvisL.transform, pelvisL.transform.Find("knee"), transform.Find("Hand"));
-        //SetLegParents(pelvisL.transform, pelvisL.transform.Find("knee"), transform.Find("Hand"));
-
     }
 
     bool IsInUnion(Vector3 point, Vector3 centerA, float radiusA, Vector3 centerB, float radiusB)
@@ -85,11 +70,10 @@ public class BodyController : MonoBehaviour
         bool inCircleA = (point.x - centerA.x) * (point.x - centerA.x) + (point.y - centerA.y) * (point.y - centerA.y) <= radiusA * radiusA;
         bool inCircleB = (point.x - centerB.x) * (point.x - centerB.x) + (point.y - centerB.y) * (point.y - centerB.y) <= radiusB * radiusB;
 
-        return inCircleA && inCircleB; // µÎ ¿ø Áß ÇÏ³ª¿¡ Æ÷ÇÔµÇ´ÂÁö È®ÀÎ
+        return inCircleA && inCircleB; // ë‘˜ ì¤‘ í•˜ë‚˜ì— í¬í•¨ë˜ëŠ”ì§€ í™•ì¸
     }
     Vector3 ClampToBoundary(Vector3 cPosition, Vector3 centerA, float radiusA, Vector3 centerB, float radiusB)
     {
-        //// A¿Í BÀÇ ¹İ°æ ¾ÈÂÊ °æ°è·Î À§Ä¡¸¦ Á¦ÇÑ
         Vector3 dirA = cPosition - centerA;
         Vector3 dirB = cPosition - centerB;
 
@@ -112,56 +96,4 @@ public class BodyController : MonoBehaviour
 
         return cPosition;
     }
-    
-    void SetLegParents(int index,Transform start, Transform midle, Transform target) //index´Â 0ºÎÅÍ 3ÀÇ ¹è¼ö·Î ÀÛ¼ºÇÏ¶ó
-    {
-        this.GetComponent<LineRenderer>().SetPosition(index, start.transform.position);
-        this.GetComponent<LineRenderer>().SetPosition(index + 1, midle.transform.position);
-        this.GetComponent<LineRenderer>().SetPosition(index + 2, target.transform.position);
-        //this.GetComponent<LineRenderer>().SetPosition(index + 3, new Vector3(float.NaN, float.NaN, float.NaN));
-
-    }
-
-    //void OnDrawGizmos()
-    //{
-    //    // ¿øÀ» ½Ã°¢ÀûÀ¸·Î Ç¥½Ã
-    //    Gizmos.color = Color.red;
-    //    Gizmos.DrawWireSphere(LeftLeg.foot.transform.position, radius);
-    //    Gizmos.color = Color.blue;
-    //    Gizmos.DrawWireSphere(RightLeg.foot.transform.position, radius);
-    //}
-    //±×³É È£¸®Á¨Å»·Î Å° ¹Ş°í
-    //ground Ã¼Å©ÇØ¼­
-    //ÇÏ³ª¶óµµ ´ê¾Æ ÀÖÀ¸¸é »óÇÏÁÂ¿ì ¿òÁ÷ÀÌ±â
-    //µÎ°³ ¸ğµÎ ´ê¾Æ ÀÖÀ¸¸é µÑ´Ù ÃÖ´ë°Å¸® °è»êÇØ¼­ ¿òÁ÷ÀÌ±â.
-
-    //¶¥¿¡ ´ê¾Æ ÀÖÀ»¶§µµ °ñ¹İÀÌ ¾î¶»°Ô ¿òÁ÷ÀÏ °ÍÀÎÁö Á¤±³ÇÏ°Ô ½Ã½ºÅÛ±âÈ¹À» ÇØ¾ßÇÒµí
-
-    //float x = Input.GetAxisRaw("Horizontal");
-    //float y = Input.GetAxisRaw("Vertical");
-    //if(leftFootGrounded == true && rightFootGrounded == true)
-    //{
-    //    MovingPelvis(x, y);
-    //}
-    //else if(leftFootGrounded == true && rightFootGrounded == false)
-    //{
-    //    MovingPelvis(x, y);
-    //}
-    //else if (leftFootGrounded == false && rightFootGrounded == true)
-    //{
-    //    MovingPelvis(x,y);
-    //}
-
-    //if (leftFootGrounded == false && rightFootGrounded == false)
-    //{
-    //    this.GetComponent<Rigidbody2D>().gravityScale = 1;
-    //}
-    //else
-    //{
-    //    this.GetComponent<Rigidbody2D>().gravityScale = 0;
-    //}
-    //void MovingPelvis(float x,float y)
-    //{
-    //    this.transform.position = this.transform.position + new Vector3(x, y, 0) * Time.deltaTime * speed;
-    //}
 }
