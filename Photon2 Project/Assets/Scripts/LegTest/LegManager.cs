@@ -15,8 +15,6 @@ public class LegManager : NetworkBehaviour
     [SerializeField] float shinLength = 2.52f;  // 무릎 - 발
     [SerializeField] int bendDirection = 1;    // 무릎이 반대로 굽으면 -1로 바꿀 것
 
-    [Header("index")]
-    public float pf_dis;
     [SerializeField] float footSpeed = 15f; //초당 발이 이동할 수 있는 최대 거리
 
     [Header("Foot")]
@@ -46,6 +44,8 @@ public class LegManager : NetworkBehaviour
         FootGrounded();
         FootLookMouse();
         FootGroundedFromFoot();
+
+        SolveTwoBoneIK();
 
         //foot는 NetworkTransform이 붙어있어서, 매 렌더 프레임(Update)에서 회전을 바꾸면
         //다음 프레임에 마지막 틱 상태로 되돌려진다. 그래서 회전은 여기서 확정해야 한다.
@@ -82,9 +82,6 @@ public class LegManager : NetworkBehaviour
     // Update is called once per frame (순수 시각 요소만 갱신, 매 프레임 실행해도 안전)
     void Update()
     {
-        SolveTwoBoneIK(); //렌더 프레임마다 다시 계산해야 낙하처럼 빠르게 움직일 때도 무릎이 끊기지 않고 부드럽게 따라온다
-
-        pf_dis = Vector2.SqrMagnitude((Vector2)pelvis.transform.position - (Vector2)foot.transform.position);
         lenderVec = new Vector3[] { pelvis.transform.position, knee.transform.position, foot.transform.position };
         //this.GetComponent<LineRenderer>().SetPositions(lenderVec);
     }
@@ -114,14 +111,8 @@ public class LegManager : NetworkBehaviour
     //바닥에 닿았는지 (발 기준)
     void FootGroundedFromFoot()
     {
-        if (Physics2D.OverlapCircle(foot.transform.position, groundCheckRadius, LayerMask.GetMask("Ground")))
-        {
-            this.isGround = true;
-        }
-        else
-        {
-            this.isGround = false;
-        }
+        Collider2D hit = Physics2D.OverlapCircle(foot.transform.position, groundCheckRadius, LayerMask.GetMask("Ground"));
+        isGround = hit != null;
     }
 
     //골반 기준 장애물 체크
