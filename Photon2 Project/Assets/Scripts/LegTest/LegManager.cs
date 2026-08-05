@@ -20,6 +20,7 @@ public class LegManager : NetworkBehaviour
     [SerializeField] float footSpeed = 15f; //초당 발이 이동할 수 있는 최대 거리
 
     [Header("Foot")]
+    float groundCheckRadius = 0.15f;
     public bool isGround;
     public bool isObstacle;
 
@@ -31,7 +32,7 @@ public class LegManager : NetworkBehaviour
     void Start()
     {
         lenderVec = new Vector3[] { pelvis.transform.position, knee.transform.position, foot.transform.position };
-        this.GetComponent<LineRenderer>().positionCount = lenderVec.Length;
+        //this.GetComponent<LineRenderer>().positionCount = lenderVec.Length;
     }
 
     public override void FixedUpdateNetwork()
@@ -45,7 +46,6 @@ public class LegManager : NetworkBehaviour
         FootGrounded();
         FootLookMouse();
         FootGroundedFromFoot();
-        SolveTwoBoneIK(); //실제 발 위치를 기준으로 무릎 위치를 삼각형 계산으로 구한다
 
         //foot는 NetworkTransform이 붙어있어서, 매 렌더 프레임(Update)에서 회전을 바꾸면
         //다음 프레임에 마지막 틱 상태로 되돌려진다. 그래서 회전은 여기서 확정해야 한다.
@@ -82,10 +82,11 @@ public class LegManager : NetworkBehaviour
     // Update is called once per frame (순수 시각 요소만 갱신, 매 프레임 실행해도 안전)
     void Update()
     {
-        pf_dis = Vector2.SqrMagnitude((Vector2)pelvis.transform.position - (Vector2)foot.transform.position);
+        SolveTwoBoneIK(); //렌더 프레임마다 다시 계산해야 낙하처럼 빠르게 움직일 때도 무릎이 끊기지 않고 부드럽게 따라온다
 
+        pf_dis = Vector2.SqrMagnitude((Vector2)pelvis.transform.position - (Vector2)foot.transform.position);
         lenderVec = new Vector3[] { pelvis.transform.position, knee.transform.position, foot.transform.position };
-        this.GetComponent<LineRenderer>().SetPositions(lenderVec);
+        //this.GetComponent<LineRenderer>().SetPositions(lenderVec);
     }
 
     void FootLookMouse()
@@ -113,7 +114,7 @@ public class LegManager : NetworkBehaviour
     //바닥에 닿았는지 (발 기준)
     void FootGroundedFromFoot()
     {
-        if (Physics2D.Raycast(foot.transform.position, (mouseWorldPos - (Vector2)foot.transform.position).normalized, 0.5f, LayerMask.GetMask("Ground")))
+        if (Physics2D.OverlapCircle(foot.transform.position, groundCheckRadius, LayerMask.GetMask("Ground")))
         {
             this.isGround = true;
         }
@@ -127,15 +128,19 @@ public class LegManager : NetworkBehaviour
     void FootGrounded()
     {
         float maxReach = thighLength + shinLength;
-        raycastHit = Physics2D.Raycast(pelvis.transform.position, (mouseWorldPos - (Vector2)pelvis.transform.position).normalized, maxReach, LayerMask.GetMask("Ground"));
-        if (raycastHit)
-        {
-            isObstacle = true;
-        }
-        else
+        Vector2 pelvisPos = pelvis.transform.position;
+        Vector2 toMouse = mouseWorldPos - pelvisPos;
+
+        if (toMouse.sqrMagnitude < 0.0001f)
         {
             isObstacle = false;
+            return;
         }
+
+        // 마우스가 다리 최대 길이보다 가까우면 마우스까지만 검사한다.
+        float rayDistance = Mathf.Min(toMouse.magnitude, maxReach);
+        raycastHit = Physics2D.Raycast(pelvisPos, toMouse.normalized, rayDistance, LayerMask.GetMask("Ground"));
+        isObstacle = raycastHit.collider != null;
     }
 
     private void OnDrawGizmos()

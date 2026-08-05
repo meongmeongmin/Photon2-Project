@@ -25,8 +25,7 @@ public class ArmManager : NetworkBehaviour
     void Start()
     {
         lenderVec = new Vector3[] { sholder.transform.position, elbow.transform.position, hand.transform.position };
-
-        this.GetComponent<LineRenderer>().positionCount = lenderVec.Length;
+        //this.GetComponent<LineRenderer>().positionCount = lenderVec.Length;
     }
 
     public override void FixedUpdateNetwork()
@@ -38,7 +37,6 @@ public class ArmManager : NetworkBehaviour
 
         //호스트만 실제로 손/팔꿈치 목표 위치를 계산해서 옮긴다
         HandLookMouse();
-        SolveTwoBoneIK(); //실제 손 위치를 기준으로 팔꿈치 위치를 삼각형 계산으로 구한다
 
         //hand는 NetworkTransform이 붙어있어서, 매 렌더 프레임(Update)에서 회전을 바꾸면
         //다음 프레임에 마지막 틱 상태로 되돌려진다. 그래서 회전은 여기서 확정해야 한다.
@@ -75,10 +73,12 @@ public class ArmManager : NetworkBehaviour
     // Update is called once per frame (순수 시각 요소만 갱신, 매 프레임 실행해도 안전)
     void Update()
     {
+        SolveTwoBoneIK(); //렌더 프레임마다 다시 계산해야 낙하처럼 빠르게 움직일 때도 팔꿈치가 끊기지 않고 부드럽게 따라온다
+
         pf_dis = Vector2.SqrMagnitude((Vector2)sholder.transform.position - (Vector2)hand.transform.position);
 
         lenderVec = new Vector3[] { sholder.transform.position, elbow.transform.position, hand.transform.position };
-        this.GetComponent<LineRenderer>().SetPositions(lenderVec);
+        //this.GetComponent<LineRenderer>().SetPositions(lenderVec);
     }
 
     void HandLookMouse()
