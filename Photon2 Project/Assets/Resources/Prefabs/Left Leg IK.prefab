@@ -273,7 +273,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &7000433476303516235
 Transform:
   m_ObjectHideFlags: 0
@@ -310,6 +310,7 @@ MonoBehaviour:
   pf_dis: 0
   knee_dis: 0
   max_dis: 0
+  footSpeed: 15
   isGround: 0
   isObstacle: 0
   lenderVec: []

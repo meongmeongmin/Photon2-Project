@@ -28,9 +28,23 @@ public class BodyController : NetworkBehaviour
     [SerializeField] Vector3 pelvisL_ChildPos;
     [SerializeField] Vector3 pelvisR_ChildPos;
 
+    Vector3 spawnPosition;
+
+    public override void Spawned()
+    {
+        spawnPosition = transform.position; //테스트용 R키 리셋을 위해 스폰 위치를 기억해둔다
+    }
+
     public override void FixedUpdateNetwork()
     {
         if (!Object.HasStateAuthority) return; //공유 몸통 물리는 호스트만 시뮬레이션한다
+
+        //테스트용: R키를 누르면 로봇을 처음 스폰 위치로 되돌린다
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            this.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
+            this.transform.position = spawnPosition;
+        }
 
         leftFootGrounded = LeftLeg.isGround;
         rightFootGrounded = RightLeg.isGround;

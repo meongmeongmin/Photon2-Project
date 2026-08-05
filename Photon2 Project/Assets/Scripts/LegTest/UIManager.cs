@@ -69,8 +69,6 @@ public class UIManager : MonoBehaviour
 
         if (isrobot == false)
         {
-            CloseAllCanvas();
-
             var robotObj = runner.Spawn(RobotPrefab, new Vector3(-11, 4, 0), Quaternion.identity);
             NetworkRobot = robotObj;
             pelvis = robotObj.transform.Find("MainPelvis");
@@ -140,14 +138,14 @@ public class UIManager : MonoBehaviour
     {
         gameObject4.SetActive(true);  // 모든 플레이어의 화면을 변경
         main_Cam.gameObject.SetActive(true);
-        GameObject roomCanvas = GameObject.Find("RoomCanvas(3)");
+        GameObject roomCanvas = GameObject.Find("RoomCanvas");
         if (roomCanvas != null)
         {
             roomCanvas.SetActive(false);
         }
         else
         {
-            Debug.LogError("RoomCanvas(3)를 찾을 수 없습니다.");
+            Debug.LogError("RoomCanvas를 찾을 수 없습니다.");
         }
     }
 }

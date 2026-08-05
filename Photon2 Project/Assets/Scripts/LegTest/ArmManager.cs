@@ -40,6 +40,11 @@ public class ArmManager : NetworkBehaviour
 
         //호스트만 실제로 손/팔꿈치 목표 위치를 계산해서 옮긴다
         footLookMouse();
+
+        //hand는 NetworkTransform이 붙어있어서, 매 렌더 프레임(Update)에서 회전을 바꾸면
+        //다음 프레임에 마지막 틱 상태로 되돌려진다. 그래서 회전은 여기서 확정해야 한다.
+        Vector2 direction = (elbow.transform.position - hand.transform.position).normalized;
+        hand.transform.up = direction;
     }
 
     // Update is called once per frame
@@ -59,12 +64,14 @@ public class ArmManager : NetworkBehaviour
         {
             elbow.transform.position = pf_center.position;
         }
+
         //어깨-손 중심 방향으로 회전
         Vector2 pf_centerDir = pf_center.position - hand.transform.position;
         float dir = Mathf.Atan2(pf_centerDir.y, pf_centerDir.x) * Mathf.Rad2Deg + 270f;
         pf_center.rotation = Quaternion.Euler(new Vector3(0, 0, dir));
 
         lenderVec = new Vector3[] { sholder.transform.position, elbow.transform.position, hand.transform.position };
+        this.GetComponent<LineRenderer>().SetPositions(lenderVec);
         HandLookElbow();
 
     }
@@ -89,9 +96,6 @@ public class ArmManager : NetworkBehaviour
     }
     void HandLookElbow()
     {
-        Vector2 direction = (elbow.transform.position - hand.transform.position).normalized;
-        hand.transform.up = direction;
-
         Vector2 worldDirection = (sholder.transform.position - elbow.transform.position).normalized;
 
         // 부모 기준의 로컬 방향으로 변환
