@@ -174,10 +174,11 @@ MonoBehaviour:
   sholder: {fileID: 0}
   elbow: {fileID: 1361616955803421669}
   hand: {fileID: 8426401552923391921}
-  pf_center: {fileID: 3905473985534431552}
+  upperArmLength: 2.5
+  forearmLength: 2.52
+  bendDirection: 1
   pf_dis: 0
-  knee_dis: 0
-  max_dis: 0
+  footSpeed: 30
 --- !u!120 &6060761306482520364
 LineRenderer:
   serializedVersion: 3

@@ -306,10 +306,10 @@ MonoBehaviour:
   pelvis: {fileID: 0}
   knee: {fileID: 2892061246532144741}
   foot: {fileID: 850125585148693319}
-  pf_center: {fileID: 8305572423374381294}
+  thighLength: 2.5
+  shinLength: 2.52
+  bendDirection: 1
   pf_dis: 0
-  knee_dis: 0
-  max_dis: 0
   footSpeed: 15
   isGround: 0
   isObstacle: 0
