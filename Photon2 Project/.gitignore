@@ -97,3 +97,7 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Photon App Settings contain App ID keys - keep out of source control
+/[Aa]ssets/[Pp]hoton/[Ff]usion/[Rr]esources/PhotonAppSettings.asset
+/[Aa]ssets/[Pp]hoton/[Ff]usion/[Rr]esources/PhotonAppSettings.asset.meta
