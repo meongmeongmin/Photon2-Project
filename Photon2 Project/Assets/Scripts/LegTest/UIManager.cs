@@ -45,10 +45,16 @@ public class UIManager : MonoBehaviour
         if (canvases == null || canvases.Length == 0) return;
         if (index < 0 || index >= canvases.Length) return;
 
+        CloseAllCanvas();
+        canvases[index].SetActive(true);    // 현재 인덱스만 활성화
+    }
+
+    void CloseAllCanvas()
+    {
+        if (canvases == null || canvases.Length == 0) return;
+
         for (int i = 0; i < canvases.Length; i++)
-        {
-            canvases[i].SetActive(i == index);  // 현재 인덱스만 활성화
-        }
+            canvases[i].SetActive(false);  // 모든 캔버스 비활성화
     }
 
     // 플레이 버튼 클릭 시 호출되는 메서드 (호스트에서만 동작)
@@ -63,6 +69,8 @@ public class UIManager : MonoBehaviour
 
         if (isrobot == false)
         {
+            CloseAllCanvas();
+
             var robotObj = runner.Spawn(RobotPrefab, new Vector3(-11, 4, 0), Quaternion.identity);
             NetworkRobot = robotObj;
             pelvis = robotObj.transform.Find("MainPelvis");
