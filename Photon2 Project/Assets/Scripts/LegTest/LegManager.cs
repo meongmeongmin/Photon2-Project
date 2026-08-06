@@ -79,7 +79,6 @@ public class LegManager : NetworkBehaviour
         knee.transform.up = thighDir;
     }
 
-    // Update is called once per frame (순수 시각 요소만 갱신, 매 프레임 실행해도 안전)
     void Update()
     {
         lenderVec = new Vector3[] { pelvis.transform.position, knee.transform.position, foot.transform.position };

@@ -103,6 +103,7 @@ public class Chatting : MonoBehaviour
     public void HandleJoinedLobby()
     {
         Debug.Log("서버접속완료");
+        UIManager.Instance?.ShowCanvas(1); //게임서버 접속이 완료된 시점에만 GameStartCanvas를 띄운다
         LobbyPanel.SetActive(true);
         RoomPanel.SetActive(false);
         //닉네임
