@@ -189,14 +189,22 @@ public class NetworkManager : MonoBehaviour, INetworkRunnerCallbacks
 
     #region INetworkRunnerCallbacks
 
+    Vector2 lastMouseWorldPos;
+
     public void OnInput(NetworkRunner runner, NetworkInput input)
     {
         var data = new NetworkInputData();
-        if (Camera.main != null)
-        {
-            Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(UnityEngine.Input.mousePosition);
-            data.MouseWorldPos = mouseWorld;
-        }
+
+        // 창이 활성 상태이고, 마우스가 실제로 이 게임 창 위에 있을 때만 마우스 좌표를 갱신한다.
+        Vector3 mousePos = UnityEngine.Input.mousePosition;
+        bool cursorInWindow = Application.isFocused
+            && mousePos.x >= 0 && mousePos.x <= Screen.width
+            && mousePos.y >= 0 && mousePos.y <= Screen.height;
+
+        if (cursorInWindow && Camera.main != null)
+            lastMouseWorldPos = Camera.main.ScreenToWorldPoint(mousePos);
+
+        data.MouseWorldPos = lastMouseWorldPos;
         input.Set(data);
     }
 
