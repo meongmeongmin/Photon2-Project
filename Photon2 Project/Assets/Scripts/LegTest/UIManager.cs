@@ -6,6 +6,8 @@ using UnityEngine;
 
 public class UIManager : MonoBehaviour
 {
+    private static readonly Vector3 RobotSpawnPosition = new Vector3(-11f, 4f, 0f);
+
     public static UIManager Instance;
 
     public GameObject[] canvases;
@@ -69,7 +71,22 @@ public class UIManager : MonoBehaviour
 
         if (isrobot == false)
         {
-            var robotObj = runner.Spawn(RobotPrefab, new Vector3(-11, 4, 0), Quaternion.identity);
+            var robotObj = runner.Spawn(
+                RobotPrefab,
+                RobotSpawnPosition,
+                Quaternion.identity,
+                onBeforeSpawned: (_, spawnedObject) =>
+                {
+                    // Keep the networked child transform relative to the spawned root.
+                    // If the prefab was saved away from the origin, host and proxies can
+                    // otherwise start from different transform bases.
+                    Transform spawnedPelvis = spawnedObject.transform.Find("MainPelvis");
+                    if (spawnedPelvis != null)
+                    {
+                        spawnedPelvis.localPosition = Vector3.zero;
+                        spawnedPelvis.localRotation = Quaternion.identity;
+                    }
+                });
             NetworkRobot = robotObj;
             pelvis = robotObj.transform.Find("MainPelvis");
             if (pelvis == null)
@@ -84,8 +101,6 @@ public class UIManager : MonoBehaviour
                 Debug.LogError("BodyController의 sholderL/sholderR/pelvisL/pelvisR 앵커가 Robot 프리팹 Inspector에서 연결되지 않았습니다.");
                 return;
             }
-
-            pelvis.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
 
             // 4명의 접속 플레이어에게 사지를 1:1로 배정한다 (스폰 시점에 InputAuthority 지정)
             var players = runner.ActivePlayers.ToList();
@@ -110,11 +125,6 @@ public class UIManager : MonoBehaviour
         if (gameObject4 != null)
         {
             SessionRpc.Instance?.RPC_ChangeScreen();
-
-            main_Cam.transform.SetParent(pelvis.transform);
-            main_Cam.transform.localPosition = new Vector3(0, 0, -10);
-
-            pelvis.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
 
             Debug.Log("파츠 스폰 및 플레이어 할당 완료!");
         }
@@ -146,6 +156,23 @@ public class UIManager : MonoBehaviour
         else
         {
             Debug.LogError("RoomCanvas를 찾을 수 없습니다.");
+        }
+    }
+
+    void Update()
+    {
+        //카메라를 로봇(MainPelvis)에 붙이는 작업을 여기서 계속 재시도한다.
+        //RPC_ChangeScreen과 로봇 Spawn은 네트워크로 각각 전달되기 때문에, 클라이언트에 따라
+        //RPC가 로봇 Spawn보다 먼저 도착할 수 있다 - 그 순간에 한 번만 시도하면 로봇을 못 찾고 영영 못 붙는다.
+        //그래서 아직 안 붙어있으면(parent == null) 로봇이 로컬에 나타날 때까지 매 프레임 계속 시도한다.
+        if (gameObject4 != null && gameObject4.activeSelf && main_Cam != null && main_Cam.transform.parent == null)
+        {
+            var body = FindFirstObjectByType<BodyController>();
+            if (body != null)
+            {
+                main_Cam.transform.SetParent(body.transform);
+                main_Cam.transform.localPosition = new Vector3(0, 0, -10);
+            }
         }
     }
 }

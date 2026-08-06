@@ -25,17 +25,49 @@ public class LegManager : NetworkBehaviour
     RaycastHit2D raycastHit;
     Vector2 mouseWorldPos;
 
-    [Header("LineLenderer")]
-    [SerializeField] Vector3[] lenderVec;
-    void Start()
+    [Networked] Vector2 NetworkFootOffset { get; set; }
+
+    public override void Spawned()
     {
-        lenderVec = new Vector3[] { pelvis.transform.position, knee.transform.position, foot.transform.position };
-        //this.GetComponent<LineRenderer>().positionCount = lenderVec.Length;
+        if (TryResolvePelvis() && Object.HasStateAuthority)
+        {
+            NetworkFootOffset = (Vector2)foot.transform.position - (Vector2)pelvis.transform.position;
+        }
+    }
+
+    void LateUpdate()
+    {
+        // Knee and foot have separate NetworkTransforms. Their interpolated snapshots
+        // do not necessarily represent the same tick, which can visually stretch a leg.
+        // On proxies, rebuild the knee from the synchronized foot after interpolation.
+        if (Object == null || Object.HasStateAuthority) return;
+        if (!TryResolvePelvis()) return;
+
+        // Apply the authoritative pose relative to the locally rendered pelvis.
+        // This keeps body forecast and limb rendering on a consistent spatial basis.
+        foot.transform.position = (Vector2)pelvis.transform.position + NetworkFootOffset;
+        SolveTwoBoneIK();
+
+        Vector2 direction = (knee.transform.position - foot.transform.position).normalized;
+        foot.transform.up = direction;
+    }
+
+    bool TryResolvePelvis()
+    {
+        if (pelvis != null) return true;
+
+        var body = FindFirstObjectByType<BodyController>();
+        if (body == null) return false;
+
+        bool isLeftLeg = gameObject.name.StartsWith("Left", System.StringComparison.Ordinal);
+        pelvis = isLeftLeg ? body.pelvisL : body.pelvisR;
+        return pelvis != null;
     }
 
     public override void FixedUpdateNetwork()
     {
         if (!Object.HasStateAuthority) return;
+        if (!TryResolvePelvis()) return;
         if (!GetInput(out NetworkInputData data)) return;
 
         mouseWorldPos = data.MouseWorldPos;
@@ -44,6 +76,8 @@ public class LegManager : NetworkBehaviour
         FootGrounded();
         FootLookMouse();
         FootGroundedFromFoot();
+
+        NetworkFootOffset = (Vector2)foot.transform.position - (Vector2)pelvis.transform.position;
 
         SolveTwoBoneIK();
 
@@ -77,12 +111,6 @@ public class LegManager : NetworkBehaviour
         //허벅지 스프라이트가 골반 방향을 향하도록 회전
         Vector2 thighDir = (pelvisPos - kneePos).normalized;
         knee.transform.up = thighDir;
-    }
-
-    void Update()
-    {
-        lenderVec = new Vector3[] { pelvis.transform.position, knee.transform.position, foot.transform.position };
-        //this.GetComponent<LineRenderer>().SetPositions(lenderVec);
     }
 
     void FootLookMouse()

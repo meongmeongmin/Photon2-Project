@@ -19,23 +19,54 @@ public class ArmManager : NetworkBehaviour
     [SerializeField] float handSpeed = 15f; //초당 손이 이동할 수 있는 최대 거리
 
     Vector2 mouseWorldPos;
-    [Header("LineLenderer")]
-    Vector3[] lenderVec;
-    void Start()
+
+    [Networked] Vector2 NetworkHandOffset { get; set; }
+
+    public override void Spawned()
     {
-        lenderVec = new Vector3[] { sholder.transform.position, elbow.transform.position, hand.transform.position };
-        //this.GetComponent<LineRenderer>().positionCount = lenderVec.Length;
+        if (TryResolveShoulder() && Object.HasStateAuthority)
+        {
+            NetworkHandOffset = (Vector2)hand.transform.position - (Vector2)sholder.transform.position;
+        }
+    }
+
+    void LateUpdate()
+    {
+        if (Object == null || Object.HasStateAuthority) return;
+        if (!TryResolveShoulder()) return;
+
+        // Rebuild the arm from the host-authored shoulder-relative hand pose.
+        // This prevents body forecast and hand interpolation from separating joints.
+        hand.transform.position = (Vector2)sholder.transform.position + NetworkHandOffset;
+        SolveTwoBoneIK();
+
+        Vector2 direction = (elbow.transform.position - hand.transform.position).normalized;
+        hand.transform.up = direction;
+    }
+
+    bool TryResolveShoulder()
+    {
+        if (sholder != null) return true;
+
+        var body = FindFirstObjectByType<BodyController>();
+        if (body == null) return false;
+
+        bool isLeftArm = gameObject.name.StartsWith("Left", System.StringComparison.Ordinal);
+        sholder = isLeftArm ? body.sholderL : body.sholderR;
+        return sholder != null;
     }
 
     public override void FixedUpdateNetwork()
     {
         if (!Object.HasStateAuthority) return;
+        if (!TryResolveShoulder()) return;
         if (!GetInput(out NetworkInputData data)) return;
 
         mouseWorldPos = data.MouseWorldPos;
 
         //호스트만 실제로 손/팔꿈치 목표 위치를 계산해서 옮긴다
         HandLookMouse();
+        NetworkHandOffset = (Vector2)hand.transform.position - (Vector2)sholder.transform.position;
         SolveTwoBoneIK();
 
         //hand는 NetworkTransform이 붙어있어서, 매 렌더 프레임(Update)에서 회전을 바꾸면
@@ -68,12 +99,6 @@ public class ArmManager : NetworkBehaviour
         //위팔 스프라이트가 어깨 방향을 향하도록 회전
         Vector2 upperArmDir = (sholderPos - elbowPos).normalized;
         elbow.transform.up = upperArmDir;
-    }
-
-    void Update()
-    {
-        lenderVec = new Vector3[] { sholder.transform.position, elbow.transform.position, hand.transform.position };
-        //this.GetComponent<LineRenderer>().SetPositions(lenderVec);
     }
 
     void HandLookMouse()
