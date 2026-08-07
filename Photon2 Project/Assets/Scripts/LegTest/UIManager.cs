@@ -11,7 +11,10 @@ public class UIManager : MonoBehaviour
     public static UIManager Instance;
 
     public GameObject[] canvases;
-    public GameObject gameObject4;  // GameObject(4)를 참조
+    /// <summary>
+    /// Map
+    /// </summary>
+    public GameObject gameObject4;
 
     public NetworkObject NetworkRobot;
     public Camera main_Cam;
@@ -77,9 +80,9 @@ public class UIManager : MonoBehaviour
                 Quaternion.identity,
                 onBeforeSpawned: (_, spawnedObject) =>
                 {
-                    // Keep the networked child transform relative to the spawned root.
-                    // If the prefab was saved away from the origin, host and proxies can
-                    // otherwise start from different transform bases.
+                    // 네트워크 자식 Transform이 스폰된 루트를 기준으로 상대적인 위치를 유지하도록 합니다.
+                    // 프리팹이 원점에서 떨어진 위치에 저장되어 있다면,
+                    // 호스트와 프록시가 서로 다른 Transform 기준에서 시작할 수 있습니다.
                     Transform spawnedPelvis = spawnedObject.transform.Find("MainPelvis");
                     if (spawnedPelvis != null)
                     {
@@ -87,6 +90,7 @@ public class UIManager : MonoBehaviour
                         spawnedPelvis.localRotation = Quaternion.identity;
                     }
                 });
+
             NetworkRobot = robotObj;
             pelvis = robotObj.transform.Find("MainPelvis");
             if (pelvis == null)
@@ -139,7 +143,7 @@ public class UIManager : MonoBehaviour
     GameObject SpawnLimb(NetworkRunner runner, NetworkObject prefab, Vector3 localOffset, List<PlayerRef> players, int playerIndex)
     {
         Vector3 worldPos = pelvis.TransformPoint(localOffset);
-        PlayerRef? authority = playerIndex < players.Count ? players[playerIndex] : (PlayerRef?)null;
+        PlayerRef ? authority = playerIndex < players.Count ? players[playerIndex] : null;
         var obj = runner.Spawn(prefab, worldPos, pelvis.rotation, authority);
         return obj.gameObject;
     }

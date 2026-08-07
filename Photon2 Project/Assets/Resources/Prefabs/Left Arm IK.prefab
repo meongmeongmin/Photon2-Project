@@ -102,7 +102,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 158639473, guid: e725a070cec140c4caffb81624c8c787, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkTransform
   _stateAuthorityChangeErrorCorrectionDelta: 0
   SyncScale: 0
@@ -216,7 +216,7 @@ MonoBehaviour:
   elbow: {fileID: 1361616955803421669}
   hand: {fileID: 8426401552923391921}
   upperArmLength: 2.5
-  forearmLength: 2.52
+  forearmLength: 2.53
   bendDirection: 1
   handSpeed: 15
 --- !u!120 &6060761306482520364

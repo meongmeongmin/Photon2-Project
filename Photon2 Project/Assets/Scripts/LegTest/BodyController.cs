@@ -38,13 +38,13 @@ public class BodyController : NetworkBehaviour
 
         if (Object.HasStateAuthority)
         {
-            // Unity 2D physics is authoritative only on the host.
+            // 호스트만 물리 시뮬레이션
             body.bodyType = RigidbodyType2D.Dynamic;
             body.gravityScale = 1f;
         }
 
-        // Do not change proxy Rigidbody settings here. NetworkTransform's forecast
-        // physics initializes and corrects the proxy body itself.
+        // 여기서는 프록시의 Rigidbody 설정을 변경하지 않습니다.
+        // NetworkTransform의 물리 예측 기능이 프록시의 Rigidbody를 직접 초기화하고 보정합니다.
     }
 
     public override void FixedUpdateNetwork()
@@ -66,36 +66,34 @@ public class BodyController : NetworkBehaviour
         rightFootGrounded = RightLeg.isGround;
 
         isFootsGrounded = (leftFootGrounded || rightFootGrounded);
-        if(isFootsGrounded == true) //둘 중 하나라도 접지된 상태
+        if (isFootsGrounded == false)
         {
-            body.gravityScale = 0f;
-            body.linearVelocity = Vector2.zero;
-            Vector2 newPosition = body.position; // C의 다음 위치를 계산
-
-            // 키 입력에 따라 C가 이동할 방향을 결정
-            float x = Input.GetAxisRaw("Horizontal");
-            float y = Input.GetAxisRaw("Vertical");
-
-            if (x !=0 || y != 0)
-            {
-                newPosition += new Vector2(x, y) * speed * Runner.DeltaTime;
-
-                // 계산된 위치가 원 안에 있는지 확인 후 안에 있으면 이동, 밖에 있으면 경계로 클램프
-                if (IsInUnion(newPosition, LeftLeg.foot.transform.position, radius, RightLeg.foot.transform.position, radius))
-                {
-                    body.MovePosition(newPosition);
-                }
-                else
-                {
-                    Vector3 clampedPosition = ClampToBoundary(newPosition, LeftLeg.foot.transform.position, radius, RightLeg.foot.transform.position, radius);
-                    body.MovePosition(clampedPosition);
-                }
-            }
-        }
-        else //둘 다 접지되지 않았으면
-        {
-            // Unity handles gravity, collision response, and accumulated velocity.
             body.gravityScale = 1f;
+            return;
+        }
+
+        body.gravityScale = 0f;
+        body.linearVelocity = Vector2.zero;
+        Vector2 newPosition = body.position; // C의 다음 위치를 계산
+
+        // 키 입력에 따라 C가 이동할 방향을 결정
+        float x = Input.GetAxisRaw("Horizontal");
+        float y = Input.GetAxisRaw("Vertical");
+
+        if (x != 0 || y != 0)
+        {
+            newPosition += new Vector2(x, y) * speed * Runner.DeltaTime;
+
+            // 계산된 위치가 원 안에 있는지 확인 후 안에 있으면 이동, 밖에 있으면 경계로 클램프
+            if (IsInUnion(newPosition, LeftLeg.foot.transform.position, radius, RightLeg.foot.transform.position, radius))
+            {
+                body.MovePosition(newPosition);
+            }
+            else
+            {
+                Vector3 clampedPosition = ClampToBoundary(newPosition, LeftLeg.foot.transform.position, radius, RightLeg.foot.transform.position, radius);
+                body.MovePosition(clampedPosition);
+            }
         }
     }
 
@@ -106,17 +104,16 @@ public class BodyController : NetworkBehaviour
 
         return inCircleA && inCircleB; // 둘 중 하나에 포함되는지 확인
     }
+
     Vector3 ClampToBoundary(Vector3 cPosition, Vector3 centerA, float radiusA, Vector3 centerB, float radiusB)
     {
         Vector3 dirA = cPosition - centerA;
         Vector3 dirB = cPosition - centerB;
 
-
         if (dirA.sqrMagnitude > radiusA * radiusA && !(dirB.sqrMagnitude > radiusB * radiusB))
         {
             cPosition = centerA + dirA.normalized * radiusA;
         }
-
 
         if (dirB.sqrMagnitude > radiusB * radiusB && !(dirA.sqrMagnitude > radiusA * radiusA))
         {

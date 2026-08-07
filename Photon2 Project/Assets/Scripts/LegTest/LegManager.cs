@@ -37,14 +37,14 @@ public class LegManager : NetworkBehaviour
 
     void LateUpdate()
     {
-        // Knee and foot have separate NetworkTransforms. Their interpolated snapshots
-        // do not necessarily represent the same tick, which can visually stretch a leg.
-        // On proxies, rebuild the knee from the synchronized foot after interpolation.
+        // 무릎과 발에는 각각 별도의 NetworkTransform이 있습니다.
+        // 각 오브젝트의 보간된 스냅샷이 반드시 동일한 틱을 나타내는 것은 아니므로,
+        // 화면에서 다리가 늘어나 보일 수 있습니다.
+        // 프록시에서는 보간이 끝난 발 위치를 기준으로 무릎 위치를 다시 계산합니다.
         if (Object == null || Object.HasStateAuthority) return;
         if (!TryResolvePelvis()) return;
 
-        // Apply the authoritative pose relative to the locally rendered pelvis.
-        // This keeps body forecast and limb rendering on a consistent spatial basis.
+        // 신체 예측과 발 보간 과정에서 관절이 서로 분리되는 것을 방지
         foot.transform.position = (Vector2)pelvis.transform.position + NetworkFootOffset;
         SolveTwoBoneIK();
 
@@ -161,6 +161,7 @@ public class LegManager : NetworkBehaviour
         isObstacle = raycastHit.collider != null;
     }
 
+    #region Test
     private void OnDrawGizmos()
     {
         if (pelvis == null || knee == null || foot == null) return;
@@ -198,4 +199,5 @@ public class LegManager : NetworkBehaviour
             prevPoint = nextPoint;
         }
     }
+    #endregion
 }

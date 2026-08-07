@@ -12,7 +12,7 @@ public class ArmManager : NetworkBehaviour
 
     [Header("Bone Lengths (2-Bone IK)")]
     [SerializeField] float upperArmLength = 2.5f; // 어깨 - 팔꿈치
-    [SerializeField] float forearmLength = 2.5f;  // 팔꿈치 - 손
+    [SerializeField] float forearmLength = 2.53f;  // 팔꿈치 - 손
     [SerializeField] int bendDirection = 1;       // 팔꿈치가 반대로 굽으면 -1로 바꿀 것
 
     [Header("index")]
@@ -35,8 +35,7 @@ public class ArmManager : NetworkBehaviour
         if (Object == null || Object.HasStateAuthority) return;
         if (!TryResolveShoulder()) return;
 
-        // Rebuild the arm from the host-authored shoulder-relative hand pose.
-        // This prevents body forecast and hand interpolation from separating joints.
+        // 신체 예측과 손 보간 과정에서 관절이 서로 분리되는 것을 방지
         hand.transform.position = (Vector2)sholder.transform.position + NetworkHandOffset;
         SolveTwoBoneIK();
 
@@ -114,6 +113,7 @@ public class ArmManager : NetworkBehaviour
         hand.transform.position = Vector2.MoveTowards(hand.transform.position, targetPos, handSpeed * Runner.DeltaTime);
     }
 
+    #region Test
     private void OnDrawGizmos()
     {
         if (sholder == null || elbow == null || hand == null) return;
@@ -151,4 +151,5 @@ public class ArmManager : NetworkBehaviour
             prevPoint = nextPoint;
         }
     }
+    #endregion
 }
