@@ -7,6 +7,7 @@ using UnityEngine;
 public class UIManager : MonoBehaviour
 {
     private static readonly Vector3 RobotSpawnPosition = new Vector3(-11f, 4f, 0f);
+    private static readonly Vector3 CameraFollowOffset = new Vector3(0f, 0f, -10f);
 
     public static UIManager Instance;
 
@@ -34,10 +35,13 @@ public class UIManager : MonoBehaviour
     public GameObject rightLeg; // 오른쪽 다리
 
     private Transform pelvis;
+    private Transform cameraTarget;
+    private Quaternion fixedCameraRotation;
 
     void Awake()
     {
         Instance = this;
+        fixedCameraRotation = main_Cam != null ? main_Cam.transform.rotation : Quaternion.identity;
     }
 
     void Start()
@@ -167,18 +171,25 @@ public class UIManager : MonoBehaviour
 
     void Update()
     {
-        //카메라를 로봇(MainPelvis)에 붙이는 작업을 여기서 계속 재시도한다.
-        //RPC_ChangeScreen과 로봇 Spawn은 네트워크로 각각 전달되기 때문에, 클라이언트에 따라
-        //RPC가 로봇 Spawn보다 먼저 도착할 수 있다 - 그 순간에 한 번만 시도하면 로봇을 못 찾고 영영 못 붙는다.
-        //그래서 아직 안 붙어있으면(parent == null) 로봇이 로컬에 나타날 때까지 매 프레임 계속 시도한다.
-        if (gameObject4 != null && gameObject4.activeSelf && main_Cam != null && main_Cam.transform.parent == null)
+        // RPC 화면 전환과 로봇 스폰의 도착 순서가 다를 수 있으므로 몸통을 찾을 때까지 재시도한다.
+        if (gameObject4 != null && gameObject4.activeSelf && main_Cam != null && cameraTarget == null)
         {
             var body = FindFirstObjectByType<BodyController>();
             if (body != null)
             {
-                main_Cam.transform.SetParent(body.transform);
-                main_Cam.transform.localPosition = new Vector3(0, 0, -10);
+                cameraTarget = body.transform;
+
+                // 몸통 회전이 카메라로 상속되지 않도록 부모 관계를 사용하지 않는다.
+                main_Cam.transform.SetParent(null, true);
             }
         }
+    }
+
+    void LateUpdate()
+    {
+        if (main_Cam == null || cameraTarget == null) return;
+
+        // 몸통과 사지의 이번 프레임 이동이 끝난 뒤 위치만 따라가고 카메라의 월드 회전은 고정한다.
+        main_Cam.transform.SetPositionAndRotation(cameraTarget.position + CameraFollowOffset, fixedCameraRotation);
     }
 }
