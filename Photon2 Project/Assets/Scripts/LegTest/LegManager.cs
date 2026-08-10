@@ -19,13 +19,32 @@ public class LegManager : NetworkBehaviour
 
     [Header("Foot")]
     float groundCheckRadius = 0.15f;
+    // 고정된 발보다 이 높이 이상 마우스를 올리면 발 고정을 해제한다.
+    [SerializeField] float plantedReleaseHeight = 0.5f;
     public bool isGround;
     public bool isObstacle;
 
     RaycastHit2D raycastHit;
     Vector2 mouseWorldPos;
 
+    /// <summary>
+    /// 발이 목표 위치까지 도달하지 못했을 때 골반에 요청하는 월드 좌표 기준 이동량입니다.
+    /// 물리적인 힘이 아니라 마우스 목표 위치와 발의 도달 가능 위치 사이의 차이를 나타냅니다.
+    /// </summary>
     public Vector2 PelvisPull { get; private set; }
+
+    /// <summary>
+    /// 발이 바닥의 한 지점에 고정되어 몸통을 지지할 수 있는 상태인지 나타냅니다.
+    /// </summary>
+    public bool IsPlanted { get; private set; }
+
+    /// <summary>
+    /// 플레이어가 고정된 발보다 아래로 마우스를 내려 바닥을 누르는 입력의 크기입니다.
+    /// </summary>
+    public float StandPressure { get; private set; }
+
+    // 발이 처음 접지되어 고정된 월드 좌표
+    Vector2 plantedPosition;
 
     public override void Spawned()
     {
@@ -64,14 +83,138 @@ public class LegManager : NetworkBehaviour
         FollowPelvisAnchor();
         mouseWorldPos = inputMouseWorldPos;
 
-        FootGrounded();
-        LookMouse();
-        FootGroundedFromFoot();
+        // 이미 고정된 발은 그 자리를 유지하고, 아니면 마우스를 따라 이동한 뒤 접지를 시도한다.
+        if (TryMaintainPlantedFoot() == false)
+        {
+            FootGrounded();
+            LookMouse();
+            FootGroundedFromFoot();
+            TryPlantFoot();
+        }
 
         SolveTwoBoneIK();
 
         Vector2 direction = (knee.transform.position - foot.transform.position).normalized;
         foot.transform.up = direction;
+    }
+
+    public bool TryGetSupportedPelvisPull(float minExtensionRatio, float minVerticalDrop, out Vector2 supportedPull)
+    {
+        supportedPull = Vector2.zero;
+        if (!isGround || PelvisPull.sqrMagnitude <= 0.0001f) return false;
+
+        Vector2 pelvisToFoot = (Vector2)foot.transform.position - (Vector2)pelvis.transform.position;
+        float maxReach = thighLength + shinLength;
+        float extensionRatio = pelvisToFoot.magnitude / maxReach;
+        float verticalDrop = pelvis.transform.position.y - foot.transform.position.y;
+
+        // 수평으로 벌어진 다리나 충분히 펴지지 않은 다리는 몸통을 지지하지 못한다.
+        if (extensionRatio < minExtensionRatio) return false;
+        if (verticalDrop < minVerticalDrop) return false;
+
+        // 임계점을 넘는 순간 골반이 갑자기 끌리지 않도록 지지력을 0에서 1까지 서서히 키운다.
+        float extensionSupport = Mathf.InverseLerp(minExtensionRatio, 1f, extensionRatio);
+        float verticalSupport = Mathf.InverseLerp(minVerticalDrop, minVerticalDrop + 0.5f, verticalDrop);
+        supportedPull = PelvisPull * Mathf.Min(extensionSupport, verticalSupport);
+        return supportedPull.sqrMagnitude > 0.0001f;
+    }
+
+    /// <summary>
+    /// 틱의 몸통 물리 이동이 끝난 뒤 발의 월드 위치는 유지하면서 다리 루트와 무릎을 다시 맞춥니다.
+    /// </summary>
+    public void RefreshHostPoseAfterPelvisMove()
+    {
+        if (Object == null || Object.HasStateAuthority == false) return;
+        if (TryResolvePelvis() == false) return;
+
+        Vector2 preservedFootPosition = IsPlanted ? plantedPosition : foot.transform.position;
+        FollowPelvisAnchor();
+
+        float maxReach = thighLength + shinLength - 0.01f;
+        Vector2 pelvisToFoot = preservedFootPosition - (Vector2)pelvis.transform.position;
+        if (pelvisToFoot.magnitude > maxReach)
+        {
+            // 몸통 이동으로 고정된 발이 최대 길이를 벗어나면 고정을 풀고 경계로 되돌린다.
+            IsPlanted = false;
+            StandPressure = 0f;
+            preservedFootPosition = (Vector2)pelvis.transform.position + pelvisToFoot.normalized * maxReach;
+        }
+
+        foot.transform.position = preservedFootPosition;
+        SolveTwoBoneIK();
+
+        Vector2 direction = (knee.transform.position - foot.transform.position).normalized;
+        foot.transform.up = direction;
+    }
+
+    /// <summary>
+    /// 고정된 발과 현재 골반 위치를 기준으로 기립에 사용할 압력과 남은 상승 거리를 계산합니다.
+    /// 발의 좌우 간격이 다리의 목표 길이보다 넓으면 해당 다리로는 일어설 수 없습니다.
+    /// </summary>
+    public bool TryGetStandingSupport(float targetExtensionRatio, float minPressure, out float pressure, out float riseDistance)
+    {
+        pressure = 0f;
+        riseDistance = 0f;
+        if (!IsPlanted || StandPressure < minPressure) return false;
+
+        float targetReach = (thighLength + shinLength) * targetExtensionRatio;
+        float horizontalDistance = Mathf.Abs(pelvis.transform.position.x - plantedPosition.x);
+        if (horizontalDistance >= targetReach) return false;
+
+        // 피타고라스 정리로 목표 다리 길이에서 가능한 골반의 수직 높이를 구한다.
+        float targetVerticalDistance = Mathf.Sqrt(targetReach * targetReach - horizontalDistance * horizontalDistance);
+        float currentVerticalDistance = pelvis.transform.position.y - plantedPosition.y;
+
+        pressure = StandPressure;
+        riseDistance = Mathf.Max(0f, targetVerticalDistance - currentVerticalDistance);
+        return riseDistance > 0.001f;
+    }
+
+    /// <summary>
+    /// 고정된 발을 접지 지점에 유지하고 플레이어 입력을 기립 압력과 골반 이동 요청으로 분리합니다.
+    /// </summary>
+    bool TryMaintainPlantedFoot()
+    {
+        if (!IsPlanted) return false;
+
+        // 마우스를 위로 올리거나 바닥이 사라지면 발 고정을 해제한다.
+        bool wantsToRelease = mouseWorldPos.y > plantedPosition.y + plantedReleaseHeight;
+        bool groundStillExists = Physics2D.OverlapCircle(plantedPosition, groundCheckRadius, LayerMask.GetMask("Ground")) != null;
+        float maxReach = thighLength + shinLength - 0.01f;
+        Vector2 pelvisToPlantedFoot = plantedPosition - (Vector2)pelvis.transform.position;
+        bool legOverstretched = pelvisToPlantedFoot.magnitude > maxReach;
+
+        if (wantsToRelease || !groundStillExists || legOverstretched)
+        {
+            IsPlanted = false;
+            StandPressure = 0f;
+
+            // 고정 해제 순간에도 발이 다리 최대 길이 밖에 남지 않도록 즉시 보정한다.
+            if (legOverstretched) foot.transform.position = (Vector2)pelvis.transform.position + pelvisToPlantedFoot.normalized * maxReach;
+            return false;
+        }
+
+        foot.transform.position = plantedPosition;
+        isGround = true;
+        isObstacle = true;
+
+        // 아래쪽 입력은 기립 압력, 좌우 및 위쪽 입력은 골반 이동 요청으로 사용한다.
+        Vector2 blockedInput = mouseWorldPos - plantedPosition;
+        StandPressure = Mathf.Max(0f, -blockedInput.y);
+        PelvisPull = new Vector2(blockedInput.x, Mathf.Max(0f, blockedInput.y));
+        return true;
+    }
+
+    /// <summary>
+    /// 이동이 끝난 발이 바닥에 닿아 있으면 현재 위치에 고정합니다.
+    /// </summary>
+    void TryPlantFoot()
+    {
+        StandPressure = 0f;
+        if (!isGround) return;
+
+        IsPlanted = true;
+        plantedPosition = foot.transform.position;
     }
 
     void FollowPelvisAnchor()
@@ -88,6 +231,15 @@ public class LegManager : NetworkBehaviour
         Vector2 toFoot = footPos - pelvisPos;
         float maxReach = thighLength + shinLength;
         float minReach = Mathf.Abs(thighLength - shinLength) + 0.01f;
+
+        // 계산 거리뿐 아니라 실제 발 위치도 최대 도달 범위 안으로 제한한다.
+        if (toFoot.magnitude > maxReach - 0.01f)
+        {
+            footPos = pelvisPos + toFoot.normalized * (maxReach - 0.01f);
+            foot.transform.position = footPos;
+            toFoot = footPos - pelvisPos;
+        }
+
         float d = Mathf.Clamp(toFoot.magnitude, minReach, maxReach - 0.01f);
 
         float cosAngle = (thighLength * thighLength + d * d - shinLength * shinLength) / (2f * thighLength * d);
@@ -112,7 +264,7 @@ public class LegManager : NetworkBehaviour
         {
             //장애물 위에 있으면 접지된 지점을 따라간다
             targetPos = raycastHit.point;
-            PelvisPull = Vector2.zero;
+            PelvisPull = mouseWorldPos - targetPos;
         }
         else
         {
