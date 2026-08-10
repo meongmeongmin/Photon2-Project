@@ -75,18 +75,18 @@ public class MultiplayerBuildAndRun
 
     static void PerformMacBuild(int playerCount)
     {
-        // ����Ƽ ���弼�� API�� ���
-        // ���� Ÿ�� ���� => ������, ��, �ȵ���̵�, IOS �� ��ɷ� ������ ��
+        // 유니티 에디터 API로 현재 활성 빌드 플랫폼을 바꾼다.
+        // 빌드 플랫폼은 PC(Windows/Mac), 콘솔, 모바일 등 실행 기기 종류를 뜻한다.
         EditorUserBuildSettings.SwitchActiveBuildTarget(
             BuildTargetGroup.Standalone,
             BuildTarget.StandaloneWindows
         );
 
-        // ������ Ŭ���̾�Ʈ(�÷��̾�) ���� ��ŭ �ݺ��� ����
+        // 같은 빌드를 접속 인원 수만큼 복사해서 만든다 (로컬에서 여러 창을 띄워 멀티플레이를 테스트하기 위함).
         for (int i = 1; i <= playerCount; i++)
         {
-            // ���� ��θ� �߰�
-            // ������Ʈ �̸��� �÷��̾� ��ȣ�� ����ؼ� ���� ��ο� ���� ����
+            // 저장 경로에 프로젝트 이름과 순서 번호를 붙인다
+            // (1, 2, 3...번호를 붙여서 결과물끼리 이름이 겹치지 않게 한다)
             BuildPipeline.BuildPlayer(GetScenePaths(),
                 "Builds/Win64/" + GetProjectName() + i.ToString() + "/" + GetProjectName() + i.ToString() + ".app",
                 BuildTarget.StandaloneOSX, BuildOptions.AutoRunPlayer

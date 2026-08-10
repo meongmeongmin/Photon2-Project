@@ -27,15 +27,15 @@ public class BodyController : NetworkBehaviour, IAfterTick
 
     [Header("Movement")]
     [SerializeField] float speed = 5f; // 골반 견인 입력으로 만들 수 있는 최대 수평 속도
-    [SerializeField] float movementResponse = 10f; // 현재 속도가 목표 수평 속도를 따라가는 비례 제어 계수
-    [SerializeField] float maxMovementAcceleration = 25f; // 비례 제어가 한 틱에 만들 수 있는 최대 수평 가속도
+    [SerializeField] float movementResponse = 10f; // 이 값이 클수록 현재 속도가 목표 수평 속도를 더 빠르게 따라잡는다
+    [SerializeField] float maxMovementAcceleration = 25f; // 위 값으로 계산한 힘이 한 틱에 낼 수 있는 최대 수평 가속도(이보다 세게는 못 민다)
     [SerializeField] float movementDeadZone = 0.05f; // 이 거리보다 작은 골반 견인 입력은 마우스 떨림으로 간주한다
     [SerializeField, Range(0f, 1f)] float minLegExtensionToMove = 0.85f; // 최대 다리 길이에 대한 현재 다리 길이의 최소 비율
     [SerializeField] float minFootBelowPelvis = 0.5f; // 발이 골반보다 최소한 이만큼 아래에 있어야 지지 다리로 인정한다
 
     [Header("Ground Support")]
     [SerializeField] float supportBlendSpeed = 8f; // 접지 변화가 실제 지지력에 반영되는 속도
-    [SerializeField] float supportVelocityResponse = 10f; // 현재 속도가 목표 수직 속도를 따라가는 비례 제어 계수
+    [SerializeField] float supportVelocityResponse = 10f; // 이 값이 클수록 현재 속도가 목표 수직 속도를 더 빠르게 따라잡는다
     [SerializeField] float maxSupportAcceleration = 30f; // 착지 충격 완화와 기립에 사용할 최대 수직 가속도
 
     [Header("Standing")]
@@ -46,7 +46,7 @@ public class BodyController : NetworkBehaviour, IAfterTick
     [Header("Arm-Driven Lean")]
     [SerializeField, Range(0f, 1f)] float minArmExtensionToLean = 0.45f; // 이 비율보다 팔을 길게 뻗었을 때부터 몸통에 영향을 준다
     [SerializeField] float maxBodyLeanAngle = 18f; // 양팔 입력으로 기울어질 수 있는 최대 좌우 각도
-    [SerializeField] float bodyLeanResponse = 18f; // 목표 몸통 각도를 따라가는 비례 제어 계수
+    [SerializeField] float bodyLeanResponse = 18f; // 이 값이 클수록 몸통이 목표 각도로 더 빠르게 기울어진다
     [SerializeField] float bodyLeanDamping = 6f; // 현재 회전 속도를 줄여 목표 각도 주변의 흔들림을 억제한다
     [SerializeField] float maxLeanAngularAcceleration = 540f; // 팔 입력이 만들 수 있는 최대 각가속도(도/초²)
     [SerializeField, Range(0f, 1f)] float airborneLeanMultiplier = 0.25f; // 발이 지면을 지지하지 않을 때 남길 자세 제어 비율

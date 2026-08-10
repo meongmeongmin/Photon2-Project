@@ -41,7 +41,7 @@ public class Chatting : MonoBehaviour
 
 
     #region 방리스트 갱신
-    // ◀버튼 -2 , ▶버튼 -1 , 셀 숫자
+    // num 값의 의미: -2는 이전 페이지 버튼, -1은 다음 페이지 버튼, 그 외 값은 클릭한 방 목록 칸의 번호다.
     public void MyListClick(int num)
     {
         if (num == -2) --currentPage;
@@ -52,7 +52,7 @@ public class Chatting : MonoBehaviour
 
     void MyListRenewal()
     {
-        // 최대페이지
+        // 전체 방 개수를 한 페이지에 보여줄 칸 수로 나눠 총 페이지 수를 구한다 (나눠 떨어지지 않으면 페이지 한 장을 더한다).
         maxPage = (myList.Count % CellBtn.Length == 0) ? myList.Count / CellBtn.Length : myList.Count / CellBtn.Length + 1;
 
         // 이전, 다음버튼
@@ -69,7 +69,7 @@ public class Chatting : MonoBehaviour
         }
     }
 
-    // NetworkManager.OnSessionListUpdated에서 매 프레임 최신 목록을 들고 있으므로 여기서는 폴링만 한다
+    // 방 목록 자체는 NetworkManager.OnSessionListUpdated가 갱신해 두므로, 여기서는 그 값이 바뀌었는지 매 프레임 확인만 한다.
     void Update()
     {
         if (StatusText != null)
@@ -198,7 +198,7 @@ public class Chatting : MonoBehaviour
                 ChatText[i].text = msg;
                 break;
             }
-        if (!isInput) // 꽉차면 한칸씩 위로 올림
+        if (!isInput) // 채팅창의 모든 칸이 이미 차 있으면, 한 줄씩 위로 밀어서 맨 아래에 새 메시지가 들어갈 자리를 만든다
         {
             for (int i = 1; i < ChatText.Length; i++) ChatText[i - 1].text = ChatText[i].text;
             ChatText[ChatText.Length - 1].text = msg;

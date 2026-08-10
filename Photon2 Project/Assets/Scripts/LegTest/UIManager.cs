@@ -13,7 +13,8 @@ public class UIManager : MonoBehaviour
 
     public GameObject[] canvases;
     /// <summary>
-    /// Map
+    /// 플레이 버튼을 누르면 켜지는 실제 게임 화면(맵) 오브젝트.
+    /// 인스펙터에서 반드시 연결해야 하며, 비어 있으면 플레이 버튼이 동작하지 않는다.
     /// </summary>
     public GameObject gameObject4;
 
