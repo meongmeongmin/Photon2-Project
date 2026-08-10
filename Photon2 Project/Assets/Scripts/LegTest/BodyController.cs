@@ -20,42 +20,47 @@ public class BodyController : NetworkBehaviour, IAfterTick
     public GameObject pelvisR;
 
     [Header("Ground State")]
-    // 아래 값은 각 다리의 접지 결과를 한 틱 동안 모아 보는 디버그용 상태다.
+    // 아래 값은 각 다리의 발이 땅에 닿았는지를 한 틱 동안 모아서 보여주는 디버그용 상태다.
     [SerializeField] bool leftFootGrounded;
     [SerializeField] bool rightFootGrounded;
     [SerializeField] bool isFootsGrounded;
 
     [Header("Movement")]
-    [SerializeField] float speed = 5f; // 골반 견인 입력으로 만들 수 있는 최대 수평 속도
-    [SerializeField] float movementResponse = 10f; // 이 값이 클수록 현재 속도가 목표 수평 속도를 더 빠르게 따라잡는다
-    [SerializeField] float maxMovementAcceleration = 25f; // 위 값으로 계산한 힘이 한 틱에 낼 수 있는 최대 수평 가속도(이보다 세게는 못 민다)
-    [SerializeField] float movementDeadZone = 0.05f; // 이 거리보다 작은 골반 견인 입력은 마우스 떨림으로 간주한다
+    [SerializeField] float speed = 5f;                                  // 골반 견인 입력으로 만들 수 있는 최대 수평 속도
+    [SerializeField] float movementResponse = 10f;                      // 이 값이 클수록 현재 속도가 목표 수평 속도를 더 빠르게 따라잡는다
+    [SerializeField] float maxMovementAcceleration = 25f;               // 위 값으로 계산한 힘이 한 틱에 낼 수 있는 최대 수평 가속도(이보다 세게는 못 민다)
+    [SerializeField] float movementDeadZone = 0.05f;                    // 이 거리보다 작은 골반 견인 입력은 마우스 떨림으로 간주한다
     [SerializeField, Range(0f, 1f)] float minLegExtensionToMove = 0.85f; // 최대 다리 길이에 대한 현재 다리 길이의 최소 비율
-    [SerializeField] float minFootBelowPelvis = 0.5f; // 발이 골반보다 최소한 이만큼 아래에 있어야 지지 다리로 인정한다
+    [SerializeField] float minFootBelowPelvis = 0.5f;                   // 발이 골반보다 최소한 이만큼 아래에 있어야 지지 다리로 인정한다
 
     [Header("Ground Support")]
-    [SerializeField] float supportBlendSpeed = 8f; // 접지 변화가 실제 지지력에 반영되는 속도
-    [SerializeField] float supportVelocityResponse = 10f; // 이 값이 클수록 현재 속도가 목표 수직 속도를 더 빠르게 따라잡는다
-    [SerializeField] float maxSupportAcceleration = 30f; // 착지 충격 완화와 기립에 사용할 최대 수직 가속도
+    [SerializeField] float supportBlendSpeed = 8f;          // 발이 땅에 닿거나 떨어졌을 때, 그 변화가 지지력(SupportBlend)에 반영되는 빠르기. 값이 클수록 빨리 반영된다
+    [SerializeField] float supportVelocityResponse = 10f;   // 이 값이 클수록 현재 속도가 목표 수직 속도를 더 빠르게 따라잡는다
+    [SerializeField] float maxSupportAcceleration = 30f;    // 착지 충격 완화와 기립에 사용할 최대 수직 가속도
 
     [Header("Standing")]
-    [SerializeField] float standSpeed = 3f; // 양발이 함께 바닥을 누를 때 골반이 상승하는 최대 속도
-    [SerializeField] float minStandPressure = 0.15f; // 각 다리 플레이어가 이 값 이상 아래로 당겨야 기립 입력으로 인정한다
+    [SerializeField] float standSpeed = 3f;                                 // 양발이 함께 바닥을 누를 때 골반이 상승하는 최대 속도
+    [SerializeField] float minStandPressure = 0.15f;                        // 각 다리 플레이어가 이 값 이상 아래로 당겨야 기립 입력으로 인정한다
     [SerializeField, Range(0f, 1f)] float targetStandingExtension = 0.92f; // 무릎이 완전히 펴지기 전에 상승을 멈추는 목표 다리 길이 비율
 
     [Header("Arm-Driven Lean")]
     [SerializeField, Range(0f, 1f)] float minArmExtensionToLean = 0.45f; // 이 비율보다 팔을 길게 뻗었을 때부터 몸통에 영향을 준다
-    [SerializeField] float maxBodyLeanAngle = 18f; // 양팔 입력으로 기울어질 수 있는 최대 좌우 각도
-    [SerializeField] float bodyLeanResponse = 18f; // 이 값이 클수록 몸통이 목표 각도로 더 빠르게 기울어진다
-    [SerializeField] float bodyLeanDamping = 6f; // 현재 회전 속도를 줄여 목표 각도 주변의 흔들림을 억제한다
-    [SerializeField] float maxLeanAngularAcceleration = 540f; // 팔 입력이 만들 수 있는 최대 각가속도(도/초²)
+    [SerializeField] float maxBodyLeanAngle = 18f;                      // 양팔 입력으로 기울어질 수 있는 최대 좌우 각도
+    [SerializeField] float bodyLeanResponse = 18f;                      // 이 값이 클수록 몸통이 목표 각도로 더 빠르게 기울어진다
+    [SerializeField] float bodyLeanDamping = 6f;                        // 현재 회전 속도를 줄여 목표 각도 주변의 흔들림을 억제한다
+    [SerializeField] float maxLeanAngularAcceleration = 540f;           // 팔 입력이 만들 수 있는 최대 각가속도(도/초²)
     [SerializeField, Range(0f, 1f)] float airborneLeanMultiplier = 0.25f; // 발이 지면을 지지하지 않을 때 남길 자세 제어 비율
 
     Vector3 spawnPosition;
     float spawnRotation;
     Rigidbody2D body;
 
-    // 0은 무지지, 1은 완전 지지다. Fusion 재시뮬레이션에서도 같은 보간 결과가 나오도록 틱 상태로 저장한다.
+    /// <summary>
+    /// 발이 바닥을 딛고 있는 정도를 0~1 사이 값으로 나타낸다. 0이면 발이 땅에서 완전히 떨어진 상태,
+    /// 1이면 양발이 완전히 바닥을 딛고 선 상태다. 접지 여부가 바뀔 때 이 값이 서서히 움직이면서
+    /// 지지력이 갑자기 켜지거나 꺼지지 않고 부드럽게 변하게 한다.
+    /// Fusion 재시뮬레이션에서도 같은 보간 결과가 나오도록 틱 상태로 저장한다.
+    /// </summary>
     [Networked] float SupportBlend { get; set; }
 
     public override void Spawned()
@@ -96,7 +101,7 @@ public class BodyController : NetworkBehaviour, IAfterTick
         rightFootGrounded = RightLeg.isGround;
         isFootsGrounded = leftFootGrounded || rightFootGrounded;
 
-        // 중력을 끄지 않는다. 대신 접지 여부에 따라 중력에 맞서는 지지력을 서서히 켜고 끈다.
+        // 중력을 끄지 않는다. 대신 발이 땅에 닿았는지에 따라 중력에 맞서는 지지력을 서서히 켜고 끈다.
         body.gravityScale = 1f;
         SupportBlend = Mathf.MoveTowards(SupportBlend, isFootsGrounded ? 1f : 0f, supportBlendSpeed * Runner.DeltaTime);
 
@@ -145,7 +150,7 @@ public class BodyController : NetworkBehaviour, IAfterTick
 
     /// <summary>
     /// 양발이 모두 고정되고 두 플레이어가 충분히 바닥을 누를 때 사용할 상승 속도를 계산합니다.
-    /// 두 다리 중 압력이 약하거나 상승 여유가 작은 쪽을 기준으로 속도를 제한합니다.
+    /// 두 다리 중 누르는 힘이 약하거나 더 올라갈 수 있는 거리가 짧은 쪽에 맞춰 속도를 제한합니다.
     /// </summary>
     bool TryGetStandingVelocity(out float standingVelocity)
     {
@@ -169,7 +174,7 @@ public class BodyController : NetworkBehaviour, IAfterTick
     {
         if (SupportBlend <= 0f) return;
 
-        // 목표 속도와 현재 속도의 차이를 가속도로 바꾸되, 착지나 급격한 입력에서 힘이 폭증하지 않도록 제한한다.
+        // 목표 속도와 현재 속도의 차이를 가속도로 바꾸되, 착지하거나 입력이 갑자기 바뀔 때 힘이 너무 세지지 않도록 제한한다.
         float horizontalAcceleration = Mathf.Clamp((desiredHorizontalVelocity - body.linearVelocity.x) * movementResponse, -maxMovementAcceleration, maxMovementAcceleration);
         float verticalAcceleration = Mathf.Clamp((desiredVerticalVelocity - body.linearVelocity.y) * supportVelocityResponse, -maxSupportAcceleration, maxSupportAcceleration);
 

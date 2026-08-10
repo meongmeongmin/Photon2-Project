@@ -85,9 +85,9 @@ public class UIManager : MonoBehaviour
                 Quaternion.identity,
                 onBeforeSpawned: (_, spawnedObject) =>
                 {
-                    // 네트워크 자식 Transform이 스폰된 루트를 기준으로 상대적인 위치를 유지하도록 합니다.
-                    // 프리팹이 원점에서 떨어진 위치에 저장되어 있다면,
-                    // 호스트와 프록시가 서로 다른 Transform 기준에서 시작할 수 있습니다.
+                    // 스폰된 로봇 루트를 기준으로, 골반의 상대 위치를 프리팹에 저장된 값 그대로 되돌려 놓는다.
+                    // 프리팹 자체가 원점(0,0,0)이 아닌 곳에 저장돼 있으면, 호스트 화면과 다른 플레이어 화면에서
+                    // 로봇 부품들이 서로 다른 위치에서 시작해버릴 수 있기 때문이다.
                     Transform spawnedPelvis = spawnedObject.transform.Find("MainPelvis");
                     if (spawnedPelvis != null)
                     {
@@ -145,8 +145,8 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // 로봇 골반 로컬 기준 오프셋 위치에, 지정된 순서의 플레이어를 InputAuthority로 스폰한다.
-    // 사지는 로봇과 별도의 최상위 NetworkObject로 스폰한다 (Fusion은 NetworkObject 중첩을 지원하지 않음).
+    // 골반을 기준으로 한 상대 위치(localOffset)에, 순서에 맞는 플레이어를 입력 권한(InputAuthority)으로 지정해 팔다리를 스폰한다.
+    // 팔다리는 로봇의 자식이 아니라 완전히 별도인 최상위 NetworkObject로 스폰한다 (Fusion은 NetworkObject를 서로 중첩할 수 없다).
     GameObject SpawnLimb(NetworkRunner runner, NetworkObject prefab, Vector3 localOffset, List<PlayerRef> players, int playerIndex)
     {
         Vector3 worldPos = pelvis.TransformPoint(localOffset);

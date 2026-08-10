@@ -22,7 +22,7 @@ public class LegManager : NetworkBehaviour
     [SerializeField] float footSpeed = 15f; // 마우스를 향해 발이 이동할 수 있는 초당 최대 월드 거리
 
     [Header("Foot")]
-    float groundCheckRadius = 0.15f;    // 발 중심에서 이 반지름 안에 Ground가 있으면 접지된 것으로 판단한다.
+    float groundCheckRadius = 0.15f;                    // 발 중심에서 이 반지름 안에 Ground가 있으면 접지된 것으로 판단한다.
     [SerializeField] float plantedReleaseHeight = 0.5f; // 고정된 발보다 마우스를 이 높이 이상 올리면 발을 뗀다
     public bool isGround;   // 실제 발의 접지
     public bool isObstacle; // 골반과 마우스 사이에서 Ground를 찾았는지를 나타낸다.
@@ -31,8 +31,10 @@ public class LegManager : NetworkBehaviour
     Vector2 mouseWorldPos;
 
     /// <summary>
-    /// 마우스 목표가 다리의 도달 범위나 고정된 발 너머에 있을 때 남는 월드 좌표 기준 입력입니다.
-    /// 이 값 자체는 힘이 아니며 BodyController가 지지 조건을 검사한 뒤 목표 이동 속도로 변환합니다.
+    /// 마우스를 다리가 닿을 수 있는 범위보다, 또는 고정된 발보다 더 멀리 움직였을 때
+    /// 발이 따라가지 못하고 남은 거리다.
+    /// 이 값 자체는 아직 힘이 아니다. BodyController가 이 다리가 몸통을 지지할 수 있는 자세인지
+    /// 확인한 뒤에야 실제로 몸통을 움직이는 속도로 바뀐다.
     /// </summary>
     public Vector2 PelvisPull { get; private set; }
 
@@ -108,8 +110,8 @@ public class LegManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// 현재 다리가 몸통을 당길 수 있는 자세인지 검사하고, 자세에 따른 지지 강도를 적용한 PelvisPull을 반환합니다.
-    /// 접지, 다리 펴짐 비율, 발이 골반보다 아래에 있는 높이를 모두 만족해야 합니다.
+    /// 지금 다리 자세로 몸통을 당겨도 되는지 확인하고, 확인되면 자세에 맞게 줄인 PelvisPull 값을 돌려준다.
+    /// 발이 땅에 닿아 있고, 다리가 충분히 펴져 있고, 발이 골반보다 아래에 있어야만 몸통을 당길 수 있다.
     /// </summary>
     public bool TryGetSupportedPelvisPull(float minExtensionRatio, float minVerticalDrop, out Vector2 supportedPull)
     {
@@ -125,7 +127,7 @@ public class LegManager : NetworkBehaviour
         if (extensionRatio < minExtensionRatio) return false;
         if (verticalDrop < minVerticalDrop) return false;
 
-        // 두 조건 중 약한 쪽을 사용해 임계점을 넘는 순간 견인력이 갑자기 켜지는 현상을 막는다.
+        // 두 조건 중 더 약한 쪽 값을 쓴다. 이렇게 하면 기준을 살짝 넘겼을 때 당기는 힘이 갑자기 툭 켜지지 않고 서서히 커진다.
         float extensionSupport = Mathf.InverseLerp(minExtensionRatio, 1f, extensionRatio);
         float verticalSupport = Mathf.InverseLerp(minVerticalDrop, minVerticalDrop + 0.5f, verticalDrop);
         supportedPull = PelvisPull * Mathf.Min(extensionSupport, verticalSupport);
@@ -185,7 +187,9 @@ public class LegManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// 고정된 발을 접지(바닥) 지점에 유지하고 플레이어 입력을 기립 압력과 골반 이동 요청으로 분리합니다.
+    /// 발을 고정한 자리에 그대로 붙여 두고, 그 뒤에도 계속 들어오는 마우스 입력을 둘로 나눠서 쓴다.
+    /// 마우스를 아래로 누르는 만큼은 일어서는 힘(StandPressure)으로, 옆으로 움직이는 만큼은
+    /// 몸통을 당기는 힘(PelvisPull)으로 바꾼다.
     /// </summary>
     bool TryMaintainPlantedFoot()
     {
@@ -212,7 +216,7 @@ public class LegManager : NetworkBehaviour
         isGround = true;
         isObstacle = true;
 
-        // 발 아래쪽 입력은 바닥을 누르는 기립 압력으로만 사용하고 PelvisPull의 아래 방향에서는 제거한다.
+        // 마우스를 발보다 아래로 내린 만큼은 바닥을 누르는 힘(StandPressure)으로만 쓰고, PelvisPull에는 그 아래 방향 값을 넣지 않는다.
         Vector2 blockedInput = mouseWorldPos - plantedPosition;
         StandPressure = Mathf.Max(0f, -blockedInput.y);
         PelvisPull = new Vector2(blockedInput.x, Mathf.Max(0f, blockedInput.y));
@@ -278,8 +282,8 @@ public class LegManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// 마우스 방향에서 찾은 접지점 또는 다리의 최대 도달점을 발 목표로 사용합니다.
-    /// 목표까지 닿지 못하고 남은 입력은 몸통 이동 요청인 PelvisPull로 분리합니다.
+    /// 마우스 방향으로 찾은 바닥 지점, 또는 다리가 닿을 수 있는 가장 먼 지점을 발의 목표 위치로 쓴다.
+    /// 마우스가 그 목표보다 더 멀리 있으면, 발이 못 간 나머지 거리를 PelvisPull에 담아 몸통을 당기는 데 쓴다.
     /// </summary>
     void LookMouse()
     {
@@ -299,7 +303,7 @@ public class LegManager : NetworkBehaviour
                 ? (Vector2)pelvis.transform.position + fp_dir.normalized * maxReach 
                 : mouseWorldPos;
 
-            // 발의 최대 도달 범위를 넘은 입력은 골반을 당기는 이동량으로 사용한다.
+            // 발이 최대 도달 범위를 넘어간 만큼은 골반을 당기는 데 쓴다.
             PelvisPull = mouseWorldPos - targetPos;
         }
 

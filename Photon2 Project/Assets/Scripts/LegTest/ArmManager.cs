@@ -16,7 +16,7 @@ public class ArmManager : NetworkBehaviour
     [SerializeField] int bendDirection = 1;       // 팔꿈치가 반대로 굽으면 -1로 바꿀 것
 
     [Header("Joint Movement")]
-    [SerializeField] float handSpeed = 15f; // 초당 손 목표가 이동할 수 있는 최대 거리
+    [SerializeField] float handSpeed = 15f;             // 초당 손 목표가 이동할 수 있는 최대 거리
     [SerializeField] float shoulderRotationSpeed = 240f; // 어깨 관절이 초당 회전할 수 있는 최대 각도
 
     Vector2 mouseWorldPos;
@@ -159,7 +159,8 @@ public class ArmManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// 마우스 위치를 팔의 도달 범위로 제한하고 실제 관절과 분리된 손 목표점을 이동합니다.
+    /// 실제 손 관절과는 따로 관리하는 "목표 지점"을 마우스 쪽으로 옮긴다.
+    /// 이 목표 지점은 팔이 닿을 수 있는 최대 범위 안으로 미리 제한해 둔다.
     /// </summary>
     void MoveHandTarget()
     {
