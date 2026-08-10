@@ -1,60 +1,49 @@
-using System.Collections;
-using System.Collections.Generic;
 using Fusion;
 using UnityEngine;
-using UnityEngine.AI;
 
 public class BodyController : NetworkBehaviour
 {
     [Header("Objects")]
-    //[SerializeField] GameObject body;
     public LegManager LeftLeg;
     public LegManager RightLeg;
+    public ArmManager LeftArm;
+    public ArmManager RightArm;
 
-    [Header("Limb Anchors (Robot 프리팹에서 직접 연결, 이름으로 찾지 않음)")]
+    [Header("Limb Anchors")]
     public GameObject sholderL;
     public GameObject sholderR;
     public GameObject pelvisL;
     public GameObject pelvisR;
 
-    [Header("isGrounded")]
+    [Header("Ground State")]
     [SerializeField] bool leftFootGrounded;
     [SerializeField] bool rightFootGrounded;
     [SerializeField] bool isFootsGrounded;
-    [Header("Index")]
-    [SerializeField] float speed;
-    [SerializeField] float radius;
-    [Header("PelvisChildPos")]
-    [SerializeField] Vector3 pelvisL_ChildPos;
-    [SerializeField] Vector3 pelvisR_ChildPos;
+
+    [Header("Movement")]
+    [SerializeField] float speed = 5f;
 
     Vector3 spawnPosition;
     Rigidbody2D body;
 
     public override void Spawned()
     {
-        spawnPosition = transform.position; //테스트용 R키 리셋을 위해 스폰 위치를 기억해둔다
+        spawnPosition = transform.position;
         body = GetComponent<Rigidbody2D>();
 
         if (Object.HasStateAuthority)
         {
-            // 호스트만 물리 시뮬레이션
             body.bodyType = RigidbodyType2D.Dynamic;
             body.gravityScale = 1f;
         }
-
-        // 여기서는 프록시의 Rigidbody 설정을 변경하지 않습니다.
-        // NetworkTransform의 물리 예측 기능이 프록시의 Rigidbody를 직접 초기화하고 보정합니다.
     }
 
     public override void FixedUpdateNetwork()
     {
-        if (!Object.HasStateAuthority) return; //공유 몸통 물리는 호스트만 시뮬레이션한다
-        if (body == null || LeftLeg == null || RightLeg == null) return;
-        //(이 가드가 꺼져 있으면 클라이언트에서 LeftLeg/RightLeg가 null이라 매 틱 NullReferenceException이 발생해
-        // Robot의 NetworkTransform 복제까지 함께 깨진다 - 클라이언트에는 UIManager의 host-only 배선 코드가 실행되지 않기 때문)
+        if (Object.HasStateAuthority == false) return;
+        if (body == null || LeftLeg == null || RightLeg == null || LeftArm == null || RightArm == null) return;
 
-        //테스트용: R키를 누르면 로봇을 처음 스폰 위치로 되돌린다
+        // 테스트용 초기 위치 복귀
         if (Input.GetKeyDown(KeyCode.R))
         {
             body.position = spawnPosition;
@@ -62,69 +51,69 @@ public class BodyController : NetworkBehaviour
             body.angularVelocity = 0f;
         }
 
+        // 모든 입력과 물리를 호스트에서 다리 → 골반 → 팔 순서로 계산한다.
+        SimulateLeg(LeftLeg);
+        SimulateLeg(RightLeg);
+
         leftFootGrounded = LeftLeg.isGround;
         rightFootGrounded = RightLeg.isGround;
+        isFootsGrounded = leftFootGrounded || rightFootGrounded;
 
-        isFootsGrounded = (leftFootGrounded || rightFootGrounded);
         if (isFootsGrounded == false)
         {
             body.gravityScale = 1f;
+            SimulateArms();
             return;
         }
 
         body.gravityScale = 0f;
         body.linearVelocity = Vector2.zero;
-        Vector2 newPosition = body.position; // C의 다음 위치를 계산
 
-        // 키 입력에 따라 C가 이동할 방향을 결정
-        float x = Input.GetAxisRaw("Horizontal");
-        float y = Input.GetAxisRaw("Vertical");
+        Vector2 pelvisPull = Vector2.zero;
+        int pullingLegCount = 0;
 
-        if (x != 0 || y != 0)
+        if (LeftLeg.PelvisPull.sqrMagnitude > 0.0001f)
         {
-            newPosition += new Vector2(x, y) * speed * Runner.DeltaTime;
+            pelvisPull += LeftLeg.PelvisPull;
+            pullingLegCount++;
+        }
 
-            // 계산된 위치가 원 안에 있는지 확인 후 안에 있으면 이동, 밖에 있으면 경계로 클램프
-            if (IsInUnion(newPosition, LeftLeg.foot.transform.position, radius, RightLeg.foot.transform.position, radius))
-            {
-                body.MovePosition(newPosition);
-            }
-            else
-            {
-                Vector3 clampedPosition = ClampToBoundary(newPosition, LeftLeg.foot.transform.position, radius, RightLeg.foot.transform.position, radius);
-                body.MovePosition(clampedPosition);
-            }
+        if (RightLeg.PelvisPull.sqrMagnitude > 0.0001f)
+        {
+            pelvisPull += RightLeg.PelvisPull;
+            pullingLegCount++;
+        }
+
+        if (pullingLegCount > 0)
+        {
+            // 두 다리가 동시에 당길 때는 한쪽이 다른 쪽을 덮지 않도록 평균을 사용한다.
+            pelvisPull /= pullingLegCount;
+            Vector2 movement = Vector2.ClampMagnitude(pelvisPull, speed * Runner.DeltaTime);
+            body.MovePosition(body.position + movement);
+        }
+
+        SimulateArms();
+    }
+
+    void SimulateLeg(LegManager leg)
+    {
+        if (Runner.TryGetInputForPlayer(leg.Object.InputAuthority, out NetworkInputData input))
+        {
+            leg.SimulateHost(input.MouseWorldPos);
         }
     }
 
-    bool IsInUnion(Vector3 point, Vector3 centerA, float radiusA, Vector3 centerB, float radiusB)
+    void SimulateArms()
     {
-        bool inCircleA = (point.x - centerA.x) * (point.x - centerA.x) + (point.y - centerA.y) * (point.y - centerA.y) <= radiusA * radiusA;
-        bool inCircleB = (point.x - centerB.x) * (point.x - centerB.x) + (point.y - centerB.y) * (point.y - centerB.y) <= radiusB * radiusB;
-
-        return inCircleA && inCircleB; // 둘 중 하나에 포함되는지 확인
+        SimulateArm(LeftArm);
+        SimulateArm(RightArm);
     }
 
-    Vector3 ClampToBoundary(Vector3 cPosition, Vector3 centerA, float radiusA, Vector3 centerB, float radiusB)
+    void SimulateArm(ArmManager arm)
     {
-        Vector3 dirA = cPosition - centerA;
-        Vector3 dirB = cPosition - centerB;
-
-        if (dirA.sqrMagnitude > radiusA * radiusA && !(dirB.sqrMagnitude > radiusB * radiusB))
+        if (Runner.TryGetInputForPlayer(arm.Object.InputAuthority, out NetworkInputData input))
         {
-            cPosition = centerA + dirA.normalized * radiusA;
+            arm.SimulateHost(input.MouseWorldPos);
         }
-
-        if (dirB.sqrMagnitude > radiusB * radiusB && !(dirA.sqrMagnitude > radiusA * radiusA))
-        {
-            cPosition = centerB + dirB.normalized * radiusB;
-        }
-
-        if (dirA.sqrMagnitude > radiusA * radiusA && dirB.sqrMagnitude > radiusB * radiusB)
-        {
-            cPosition = ((centerA + dirA.normalized * radiusA) + (centerB + dirB.normalized * radiusB)) / 2;
-        }
-
-        return cPosition;
     }
 }

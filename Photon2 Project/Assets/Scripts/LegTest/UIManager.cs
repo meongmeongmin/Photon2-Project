@@ -122,6 +122,8 @@ public class UIManager : MonoBehaviour
 
             bodyController.LeftLeg = leftLeg.GetComponent<LegManager>();
             bodyController.RightLeg = rightLeg.GetComponent<LegManager>();
+            bodyController.LeftArm = leftArm.GetComponent<ArmManager>();
+            bodyController.RightArm = rightArm.GetComponent<ArmManager>();
 
             isrobot = true;
         }

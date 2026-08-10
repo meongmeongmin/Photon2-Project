@@ -25,31 +25,23 @@ public class LegManager : NetworkBehaviour
     RaycastHit2D raycastHit;
     Vector2 mouseWorldPos;
 
-    [Networked] Vector2 NetworkFootOffset { get; set; }
+    public Vector2 PelvisPull { get; private set; }
 
     public override void Spawned()
     {
-        if (TryResolvePelvis() && Object.HasStateAuthority)
+        if (TryResolvePelvis())
         {
-            NetworkFootOffset = (Vector2)foot.transform.position - (Vector2)pelvis.transform.position;
+            FollowPelvisAnchor();
         }
     }
 
     void LateUpdate()
     {
-        // 무릎과 발에는 각각 별도의 NetworkTransform이 있습니다.
-        // 각 오브젝트의 보간된 스냅샷이 반드시 동일한 틱을 나타내는 것은 아니므로,
-        // 화면에서 다리가 늘어나 보일 수 있습니다.
-        // 프록시에서는 보간이 끝난 발 위치를 기준으로 무릎 위치를 다시 계산합니다.
         if (Object == null || Object.HasStateAuthority) return;
-        if (!TryResolvePelvis()) return;
+        if (TryResolvePelvis() == false) return;
 
-        // 신체 예측과 발 보간 과정에서 관절이 서로 분리되는 것을 방지
-        foot.transform.position = (Vector2)pelvis.transform.position + NetworkFootOffset;
-        SolveTwoBoneIK();
-
-        Vector2 direction = (knee.transform.position - foot.transform.position).normalized;
-        foot.transform.up = direction;
+        // 게스트의 사지 루트를 보간된 몸통 골반에 고정한다.
+        FollowPelvisAnchor();
     }
 
     bool TryResolvePelvis()
@@ -64,27 +56,27 @@ public class LegManager : NetworkBehaviour
         return pelvis != null;
     }
 
-    public override void FixedUpdateNetwork()
+    public void SimulateHost(Vector2 inputMouseWorldPos)
     {
-        if (!Object.HasStateAuthority) return;
-        if (!TryResolvePelvis()) return;
-        if (!GetInput(out NetworkInputData data)) return;
+        if (Object == null || Object.HasStateAuthority == false) return;
+        if (TryResolvePelvis() == false) return;
 
-        mouseWorldPos = data.MouseWorldPos;
+        FollowPelvisAnchor();
+        mouseWorldPos = inputMouseWorldPos;
 
-        //호스트만 실제로 발/무릎 목표 위치를 계산해서 옮긴다
         FootGrounded();
-        FootLookMouse();
+        LookMouse();
         FootGroundedFromFoot();
-
-        NetworkFootOffset = (Vector2)foot.transform.position - (Vector2)pelvis.transform.position;
 
         SolveTwoBoneIK();
 
-        //foot는 NetworkTransform이 붙어있어서, 매 렌더 프레임(Update)에서 회전을 바꾸면
-        //다음 프레임에 마지막 틱 상태로 되돌려진다. 그래서 회전은 여기서 확정해야 한다.
         Vector2 direction = (knee.transform.position - foot.transform.position).normalized;
         foot.transform.up = direction;
+    }
+
+    void FollowPelvisAnchor()
+    {
+        transform.SetPositionAndRotation(pelvis.transform.position, pelvis.transform.rotation);
     }
 
     //코사인 법칙을 이용한 2-bone IK: 골반-무릎-발 삼각형에서 무릎 위치를 구한다
@@ -113,13 +105,14 @@ public class LegManager : NetworkBehaviour
         knee.transform.up = thighDir;
     }
 
-    void FootLookMouse()
+    void LookMouse()
     {
         Vector2 targetPos;
         if (isObstacle == true)
         {
             //장애물 위에 있으면 접지된 지점을 따라간다
             targetPos = raycastHit.point;
+            PelvisPull = Vector2.zero;
         }
         else
         {
@@ -129,6 +122,9 @@ public class LegManager : NetworkBehaviour
             targetPos = (fp_dir.magnitude > maxReach)
                 ? (Vector2)pelvis.transform.position + fp_dir.normalized * maxReach 
                 : mouseWorldPos;
+
+            // 발의 최대 도달 범위를 넘은 입력은 골반을 당기는 이동량으로 사용한다.
+            PelvisPull = mouseWorldPos - targetPos;
         }
 
         //목표 위치로 즉시 스냅하지 않고, 초당 footSpeed만큼만 이동시켜 갑자기 튀지 않게 한다.

@@ -15,32 +15,25 @@ public class ArmManager : NetworkBehaviour
     [SerializeField] float forearmLength = 2.53f;  // 팔꿈치 - 손
     [SerializeField] int bendDirection = 1;       // 팔꿈치가 반대로 굽으면 -1로 바꿀 것
 
-    [Header("index")]
     [SerializeField] float handSpeed = 15f; //초당 손이 이동할 수 있는 최대 거리
 
     Vector2 mouseWorldPos;
 
-    [Networked] Vector2 NetworkHandOffset { get; set; }
-
     public override void Spawned()
     {
-        if (TryResolveShoulder() && Object.HasStateAuthority)
+        if (TryResolveShoulder())
         {
-            NetworkHandOffset = (Vector2)hand.transform.position - (Vector2)sholder.transform.position;
+            FollowShoulderAnchor();
         }
     }
 
     void LateUpdate()
     {
         if (Object == null || Object.HasStateAuthority) return;
-        if (!TryResolveShoulder()) return;
+        if (TryResolveShoulder() == false) return;
 
-        // 신체 예측과 손 보간 과정에서 관절이 서로 분리되는 것을 방지
-        hand.transform.position = (Vector2)sholder.transform.position + NetworkHandOffset;
-        SolveTwoBoneIK();
-
-        Vector2 direction = (elbow.transform.position - hand.transform.position).normalized;
-        hand.transform.up = direction;
+        // 게스트의 사지 루트를 보간된 몸통 어깨에 고정한다.
+        FollowShoulderAnchor();
     }
 
     bool TryResolveShoulder()
@@ -55,23 +48,25 @@ public class ArmManager : NetworkBehaviour
         return sholder != null;
     }
 
-    public override void FixedUpdateNetwork()
+    public void SimulateHost(Vector2 inputMouseWorldPos)
     {
-        if (!Object.HasStateAuthority) return;
-        if (!TryResolveShoulder()) return;
-        if (!GetInput(out NetworkInputData data)) return;
+        if (Object == null || Object.HasStateAuthority == false) return;
+        if (TryResolveShoulder() == false) return;
 
-        mouseWorldPos = data.MouseWorldPos;
+        FollowShoulderAnchor();
+        mouseWorldPos = inputMouseWorldPos;
 
         //호스트만 실제로 손/팔꿈치 목표 위치를 계산해서 옮긴다
-        HandLookMouse();
-        NetworkHandOffset = (Vector2)hand.transform.position - (Vector2)sholder.transform.position;
+        LookMouse();
         SolveTwoBoneIK();
 
-        //hand는 NetworkTransform이 붙어있어서, 매 렌더 프레임(Update)에서 회전을 바꾸면
-        //다음 프레임에 마지막 틱 상태로 되돌려진다. 그래서 회전은 여기서 확정해야 한다.
         Vector2 direction = (elbow.transform.position - hand.transform.position).normalized;
         hand.transform.up = direction;
+    }
+
+    void FollowShoulderAnchor()
+    {
+        transform.SetPositionAndRotation(sholder.transform.position, sholder.transform.rotation);
     }
 
     //코사인 법칙을 이용한 2-bone IK: 어깨-팔꿈치-손 삼각형에서 팔꿈치 위치를 구한다
@@ -100,7 +95,7 @@ public class ArmManager : NetworkBehaviour
         elbow.transform.up = upperArmDir;
     }
 
-    void HandLookMouse()
+    void LookMouse()
     {
         //도달 가능한 최대 거리(위팔+아래팔) 안으로 클램프
         float maxReach = upperArmLength + forearmLength;
