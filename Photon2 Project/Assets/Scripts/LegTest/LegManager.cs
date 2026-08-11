@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// 상태 권한을 가진 호스트에서 발 목표 이동, 접지·고정 상태, 2-Bone IK를 계산합니다.
-/// 이 클래스는 몸통을 직접 이동하지 않고, 이동이 필요하면 PelvisPull과 StandPressure를 BodyController에 제공합니다.
+/// 이 클래스는 몸통을 직접 이동하지 않고, 고정된 발의 접촉점과 플레이어가 발을 미는 입력을 BodyController에 제공합니다.
 /// </summary>
 public class LegManager : NetworkBehaviour
 {
@@ -22,7 +22,8 @@ public class LegManager : NetworkBehaviour
     [SerializeField] float footSpeed = 15f; // 마우스를 향해 발이 이동할 수 있는 초당 최대 월드 거리
 
     [Header("Foot")]
-    float groundCheckRadius = 0.15f;                    // 발 중심에서 이 반지름 안에 Ground가 있으면 접지된 것으로 판단한다.
+    [SerializeField, Min(0.01f)] float footCollisionRadius = 0.25f; // 절차적 발을 대표하는 가상 충돌 원의 반지름. 발 스프라이트가 바닥 안으로 들어가지 않도록 이동 검사와 접지 판정에 함께 사용한다
+    [SerializeField, Min(0f)] float groundSkin = 0.02f;              // 물리 오차로 발이 지면과 반복해서 겹치지 않도록 표면에서 추가로 띄우는 최소 간격
     [SerializeField] float plantedReleaseHeight = 0.5f; // 고정된 발보다 마우스를 이 높이 이상 올리면 발을 뗀다
     public bool isGround;   // 실제 발의 접지
     public bool isObstacle; // 골반과 마우스 사이에서 Ground를 찾았는지를 나타낸다.
@@ -31,12 +32,10 @@ public class LegManager : NetworkBehaviour
     Vector2 mouseWorldPos;
 
     /// <summary>
-    /// 마우스를 다리가 닿을 수 있는 범위보다, 또는 고정된 발보다 더 멀리 움직였을 때
-    /// 발이 따라가지 못하고 남은 거리다.
-    /// 이 값 자체는 아직 힘이 아니다. BodyController가 이 다리가 몸통을 지지할 수 있는 자세인지
-    /// 확인한 뒤에야 실제로 몸통을 움직이는 속도로 바뀐다.
+    /// 고정된 발을 움직이려고 한 입력 중 바닥 표면과 나란한 성분입니다.
+    /// BodyController는 이 입력의 반대 방향으로 제한된 지면 반력을 계산합니다.
     /// </summary>
-    public Vector2 PelvisPull { get; private set; }
+    public Vector2 GroundPushInput { get; private set; }
 
     /// <summary>
     /// 발이 바닥에 고정되어 있는지를 나타냅니다.
@@ -55,6 +54,12 @@ public class LegManager : NetworkBehaviour
     /// 발이 처음 접지했을 때 기록하며 몸통이 이동해도 유지되는 월드 좌표입니다.
     /// </summary>
     Vector2 plantedPosition;
+
+    // 발을 고정한 지면의 법선이다. 평지에서는 Vector2.up이며 경사면에서는 표면 방향을 따른다.
+    Vector2 plantedNormal = Vector2.up;
+
+    // 최대 길이 초과 등으로 고정이 풀린 발이 같은 Ground 안에서 즉시 다시 고정되는 현상을 막는다.
+    bool waitForGroundExitBeforePlanting;
 
     public override void Spawned()
     {
@@ -110,28 +115,25 @@ public class LegManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// 지금 다리 자세로 몸통을 당겨도 되는지 확인하고, 확인되면 자세에 맞게 줄인 PelvisPull 값을 돌려준다.
-    /// 발이 땅에 닿아 있고, 다리가 충분히 펴져 있고, 발이 골반보다 아래에 있어야만 몸통을 당길 수 있다.
+    /// 고정된 발이 몸통을 지지할 수 있는 접촉인지 확인하고 지면 반력 계산에 필요한 값을 반환합니다.
+    /// 단순히 발 주변에 Ground가 있는 것만으로는 부족하며 발이 고정되어 있고 골반보다 아래에 있어야 합니다.
     /// </summary>
-    public bool TryGetSupportedPelvisPull(float minExtensionRatio, float minVerticalDrop, out Vector2 supportedPull)
+    public bool TryGetGroundContact(float minVerticalDrop, out Vector2 contactPoint, out Vector2 contactNormal, out Vector2 pushInput, out float pressure)
     {
-        supportedPull = Vector2.zero;
-        if (isGround == false || PelvisPull.sqrMagnitude <= 0.0001f) return false;
+        contactPoint = Vector2.zero;
+        contactNormal = Vector2.up;
+        pushInput = Vector2.zero;
+        pressure = 0f;
+        if (IsPlanted == false || isGround == false) return false;
 
-        Vector2 pelvisToFoot = (Vector2)foot.transform.position - (Vector2)pelvis.transform.position;
-        float maxReach = thighLength + shinLength;
-        float extensionRatio = pelvisToFoot.magnitude / maxReach;
         float verticalDrop = pelvis.transform.position.y - foot.transform.position.y;
-
-        // 수평으로 벌어진 다리나 충분히 펴지지 않은 다리는 몸통을 지지하지 못한다.
-        if (extensionRatio < minExtensionRatio) return false;
         if (verticalDrop < minVerticalDrop) return false;
 
-        // 두 조건 중 더 약한 쪽 값을 쓴다. 이렇게 하면 기준을 살짝 넘겼을 때 당기는 힘이 갑자기 툭 켜지지 않고 서서히 커진다.
-        float extensionSupport = Mathf.InverseLerp(minExtensionRatio, 1f, extensionRatio);
-        float verticalSupport = Mathf.InverseLerp(minVerticalDrop, minVerticalDrop + 0.5f, verticalDrop);
-        supportedPull = PelvisPull * Mathf.Min(extensionSupport, verticalSupport);
-        return supportedPull.sqrMagnitude > 0.0001f;
+        contactPoint = plantedPosition;
+        contactNormal = plantedNormal;
+        pushInput = GroundPushInput;
+        pressure = StandPressure;
+        return true;
     }
 
     /// <summary>
@@ -153,8 +155,14 @@ public class LegManager : NetworkBehaviour
             // 몸통 이동으로 고정된 발이 최대 길이를 벗어나면 고정을 풀고 경계로 되돌린다.
             IsPlanted = false;
             StandPressure = 0f;
+            GroundPushInput = Vector2.zero;
+            waitForGroundExitBeforePlanting = true;
             preservedFootPosition = (Vector2)pelvis.transform.position + pelvisToFoot.normalized * maxReach;
         }
+
+        // 몸통 낙하나 회전으로 골반 앵커가 크게 움직인 뒤에도 발 중심이 Ground 내부에 남지 않도록 다시 표면 밖으로 보정한다.
+        preservedFootPosition = ResolveFootPenetration(preservedFootPosition);
+        if (IsPlanted) plantedPosition = preservedFootPosition;
 
         foot.transform.position = preservedFootPosition;
         SolveTwoBoneIK();
@@ -188,8 +196,8 @@ public class LegManager : NetworkBehaviour
 
     /// <summary>
     /// 발을 고정한 자리에 그대로 붙여 두고, 그 뒤에도 계속 들어오는 마우스 입력을 둘로 나눠서 쓴다.
-    /// 마우스를 아래로 누르는 만큼은 일어서는 힘(StandPressure)으로, 옆으로 움직이는 만큼은
-    /// 몸통을 당기는 힘(PelvisPull)으로 바꾼다.
+    /// 지면 안쪽으로 누르는 입력은 StandPressure로, 지면과 나란히 미는 입력은 GroundPushInput으로 분리합니다.
+    /// 두 값은 직접적인 힘이 아니며 BodyController가 마찰과 균형 조건을 적용한 뒤 지면 반력으로 변환합니다.
     /// </summary>
     bool TryMaintainPlantedFoot()
     {
@@ -197,7 +205,7 @@ public class LegManager : NetworkBehaviour
 
         // 플레이어가 발을 들거나, 접지면이 사라지거나, 몸통과 발이 최대 길이보다 멀어지면 고정을 해제한다.
         bool wantsToRelease = mouseWorldPos.y > plantedPosition.y + plantedReleaseHeight;
-        bool groundStillExists = Physics2D.OverlapCircle(plantedPosition, groundCheckRadius, LayerMask.GetMask("Ground")) != null;
+        bool groundStillExists = Physics2D.OverlapCircle(plantedPosition, footCollisionRadius + groundSkin * 2f, LayerMask.GetMask("Ground")) != null;
         float maxReach = thighLength + shinLength - 0.01f;
         Vector2 pelvisToPlantedFoot = plantedPosition - (Vector2)pelvis.transform.position;
         bool legOverstretched = pelvisToPlantedFoot.magnitude > maxReach;
@@ -206,6 +214,8 @@ public class LegManager : NetworkBehaviour
         {
             IsPlanted = false;
             StandPressure = 0f;
+            GroundPushInput = Vector2.zero;
+            waitForGroundExitBeforePlanting = true;
 
             // 고정 해제 순간에도 발이 다리 최대 길이 밖에 남지 않도록 즉시 보정한다.
             if (legOverstretched) foot.transform.position = (Vector2)pelvis.transform.position + pelvisToPlantedFoot.normalized * maxReach;
@@ -216,10 +226,11 @@ public class LegManager : NetworkBehaviour
         isGround = true;
         isObstacle = true;
 
-        // 마우스를 발보다 아래로 내린 만큼은 바닥을 누르는 힘(StandPressure)으로만 쓰고, PelvisPull에는 그 아래 방향 값을 넣지 않는다.
+        // 입력을 지면 법선과 접선으로 나눠 누르는 힘과 미는 방향을 서로 독립적으로 사용한다.
         Vector2 blockedInput = mouseWorldPos - plantedPosition;
-        StandPressure = Mathf.Max(0f, -blockedInput.y);
-        PelvisPull = new Vector2(blockedInput.x, Mathf.Max(0f, blockedInput.y));
+        float normalInput = Vector2.Dot(blockedInput, plantedNormal);
+        StandPressure = Mathf.Max(0f, -normalInput);
+        GroundPushInput = blockedInput - plantedNormal * normalInput;
         return true;
     }
 
@@ -229,10 +240,23 @@ public class LegManager : NetworkBehaviour
     void TryPlantFoot()
     {
         StandPressure = 0f;
+        GroundPushInput = Vector2.zero;
+
+        // 고정이 강제로 풀렸다면 Ground에서 완전히 빠진 한 틱을 확인한 뒤에만 다시 고정할 수 있다.
+        if (waitForGroundExitBeforePlanting)
+        {
+            if (isGround == false) waitForGroundExitBeforePlanting = false;
+            return;
+        }
+
         if (isGround == false) return;
 
         IsPlanted = true;
         plantedPosition = foot.transform.position;
+
+        // 레이로 찾은 표면 법선을 우선 사용하고, 유효하지 않으면 평지 법선을 사용한다.
+        plantedNormal = isObstacle && raycastHit.collider != null ? raycastHit.normal.normalized : Vector2.up;
+        if (Vector2.Dot(plantedNormal, Vector2.up) < 0f) plantedNormal = -plantedNormal;
     }
 
     /// <summary>
@@ -282,17 +306,16 @@ public class LegManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// 마우스 방향으로 찾은 바닥 지점, 또는 다리가 닿을 수 있는 가장 먼 지점을 발의 목표 위치로 쓴다.
-    /// 마우스가 그 목표보다 더 멀리 있으면, 발이 못 간 나머지 거리를 PelvisPull에 담아 몸통을 당기는 데 쓴다.
+    /// 마우스 방향으로 찾은 바닥 지점 또는 다리가 닿을 수 있는 가장 먼 지점을 발의 목표 위치로 사용합니다.
+    /// 고정되지 않은 발은 몸통에 힘을 전달하지 않고 관절 자세만 변경합니다.
     /// </summary>
     void LookMouse()
     {
         Vector2 targetPos;
         if (isObstacle == true)
         {
-            // 골반과 마우스 사이에 Ground가 있으면 표면을 뚫지 않고 첫 충돌 지점까지만 이동한다.
-            targetPos = raycastHit.point;
-            PelvisPull = mouseWorldPos - targetPos;
+            // 표면점에서 발 반지름만큼 법선 방향으로 띄워 발 중심을 배치한다. 중심을 표면점에 직접 두면 발의 절반이 지형 안으로 들어간다.
+            targetPos = raycastHit.point + raycastHit.normal * (footCollisionRadius + groundSkin);
         }
         else
         {
@@ -303,12 +326,20 @@ public class LegManager : NetworkBehaviour
                 ? (Vector2)pelvis.transform.position + fp_dir.normalized * maxReach 
                 : mouseWorldPos;
 
-            // 발이 최대 도달 범위를 넘어간 만큼은 골반을 당기는 데 쓴다.
-            PelvisPull = mouseWorldPos - targetPos;
         }
 
-        // 발을 즉시 순간 이동하지 않고 footSpeed로 접근시켜 입력이 급변해도 관절이 튀지 않게 한다.
-        foot.transform.position = Vector2.MoveTowards(foot.transform.position, targetPos, footSpeed * Runner.DeltaTime);
+        // 발의 실제 이동 구간도 CircleCast로 검사한다. 골반→마우스 검사 방향과 발의 이동 방향이 다르더라도 중간의 바닥을 통과하지 않는다.
+        Vector2 currentPosition = foot.transform.position;
+        Vector2 nextPosition = Vector2.MoveTowards(currentPosition, targetPos, footSpeed * Runner.DeltaTime);
+        Vector2 movement = nextPosition - currentPosition;
+
+        if (movement.sqrMagnitude > 0.000001f)
+        {
+            RaycastHit2D movementHit = Physics2D.CircleCast(currentPosition, footCollisionRadius, movement.normalized, movement.magnitude, LayerMask.GetMask("Ground"));
+            if (movementHit.collider != null) nextPosition = movementHit.centroid + movementHit.normal * groundSkin;
+        }
+
+        foot.transform.position = ResolveFootPenetration(nextPosition);
     }
 
     /// <summary>
@@ -316,13 +347,14 @@ public class LegManager : NetworkBehaviour
     /// </summary>
     void FootGroundedFromFoot()
     {
-        Collider2D hit = Physics2D.OverlapCircle(foot.transform.position, groundCheckRadius, LayerMask.GetMask("Ground"));
+        Collider2D hit = Physics2D.OverlapCircle(foot.transform.position, footCollisionRadius + groundSkin * 2f, LayerMask.GetMask("Ground"));
         isGround = hit != null;
     }
 
     /// <summary>
     /// 이름과 달리 발의 최종 접지를 판정하지 않습니다.
     /// 골반에서 마우스 방향으로 레이를 쏴 발이 먼저 닿아야 할 Ground 표면을 찾습니다.
+    /// 실제 발 크기와 이동 경로에 대한 관통 방지는 LookMouse의 CircleCast가 담당합니다.
     /// </summary>
     void FootGrounded()
     {
@@ -340,6 +372,32 @@ public class LegManager : NetworkBehaviour
         float rayDistance = Mathf.Min(toMouse.magnitude, maxReach);
         raycastHit = Physics2D.Raycast(pelvisPos, toMouse.normalized, rayDistance, LayerMask.GetMask("Ground"));
         isObstacle = raycastHit.collider != null;
+    }
+
+    /// <summary>
+    /// 이미 Ground 안에 들어간 발을 골반 쪽에서 처음 만나는 표면 바깥으로 복구합니다.
+    /// 정상 이동은 CircleCast가 관통을 예방하지만, 낙하 직전 위치나 몸통 회전으로 시작점부터 겹친 경우에는 이 사후 보정이 필요합니다.
+    /// </summary>
+    Vector2 ResolveFootPenetration(Vector2 candidatePosition)
+    {
+        int groundMask = LayerMask.GetMask("Ground");
+        Collider2D overlappedGround = Physics2D.OverlapCircle(candidatePosition, footCollisionRadius, groundMask);
+        if (overlappedGround == null) return candidatePosition;
+
+        Vector2 pelvisPosition = pelvis.transform.position;
+        Vector2 pelvisToCandidate = candidatePosition - pelvisPosition;
+        if (pelvisToCandidate.sqrMagnitude > 0.000001f)
+        {
+            RaycastHit2D surfaceHit = Physics2D.CircleCast(pelvisPosition, footCollisionRadius, pelvisToCandidate.normalized, pelvisToCandidate.magnitude, groundMask);
+            if (surfaceHit.collider != null && surfaceHit.fraction > 0.0001f) return surfaceHit.centroid + surfaceHit.normal * groundSkin;
+        }
+
+        // 골반 앵커까지 Ground 안에 있는 특수 자세에서는 위쪽의 안전한 점에서 해당 콜라이더의 가장 가까운 표면을 찾아 복구한다.
+        Vector2 recoveryProbe = candidatePosition + Vector2.up * (thighLength + shinLength + footCollisionRadius);
+        Vector2 surfacePoint = overlappedGround.ClosestPoint(recoveryProbe);
+        Vector2 recoveryNormal = (recoveryProbe - surfacePoint).normalized;
+        if (recoveryNormal.sqrMagnitude < 0.000001f) recoveryNormal = Vector2.up;
+        return surfacePoint + recoveryNormal * (footCollisionRadius + groundSkin);
     }
 
     #region Test

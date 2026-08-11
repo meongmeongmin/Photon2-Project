@@ -104,9 +104,9 @@ GameObject:
   - component: {fileID: 5419012484065842714}
   - component: {fileID: 7966698790859500463}
   - component: {fileID: 3454644842325596364}
-  - component: {fileID: 3376499308789682652}
   - component: {fileID: 5776835768282570993}
   - component: {fileID: 6472543571262249595}
+  - component: {fileID: 6606670761182528270}
   m_Layer: 4
   m_Name: MainPelvis
   m_TagString: Untagged
@@ -148,6 +148,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   LeftLeg: {fileID: 0}
   RightLeg: {fileID: 0}
+  LeftArm: {fileID: 0}
+  RightArm: {fileID: 0}
   sholderL: {fileID: 7143569805357025414}
   sholderR: {fileID: 3243393515984217626}
   pelvisL: {fileID: 3133180019380523012}
@@ -156,9 +158,29 @@ MonoBehaviour:
   rightFootGrounded: 1
   isFootsGrounded: 0
   speed: 5
-  radius: 5
-  pelvisL_ChildPos: {x: 0, y: 0, z: 0}
-  pelvisR_ChildPos: {x: 0, y: 0, z: 0}
+  movementResponse: 10
+  maxMovementAcceleration: 25
+  movementDeadZone: 0.05
+  minGroundPushPressure: 0.15
+  groundFriction: 0.8
+  minFootBelowPelvis: 0.5
+  supportBlendSpeed: 8
+  supportVelocityResponse: 10
+  maxSupportAcceleration: 30
+  footSupportRadius: 0.45
+  balanceFalloffDistance: 1
+  maxGroundReactionAngularAcceleration: 180
+  groundedAngularDamping: 4
+  maxBodyAngularVelocity: 120
+  standSpeed: 3
+  minStandPressure: 0.15
+  targetStandingExtension: 0.92
+  minArmExtensionToLean: 0.45
+  maxBodyLeanAngle: 18
+  bodyLeanResponse: 18
+  bodyLeanDamping: 6
+  maxLeanAngularAcceleration: 540
+  airborneLeanMultiplier: 0.25
 --- !u!50 &3454644842325596364
 Rigidbody2D:
   serializedVersion: 5
@@ -186,42 +208,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4
---- !u!58 &3376499308789682652
-CircleCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3814268821129353771}
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ForceSendLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ForceReceiveLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ContactCaptureLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_CallbackLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_IsTrigger: 0
-  m_UsedByEffector: 0
-  m_CompositeOperation: 0
-  m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 1.68}
-  m_Radius: 0.5
 --- !u!120 &5776835768282570993
 LineRenderer:
   serializedVersion: 3
@@ -376,6 +362,43 @@ MonoBehaviour:
     MinImpactfulCollisionAlignment: 0.3
     ImpactStartCorrectionTime: 0.1
     ImpactCorrectionTimeComplete: 0.3
+--- !u!70 &6606670761182528270
+CapsuleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3814268821129353771}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: -0.16279125, y: 5.2635865}
+  m_Size: {x: 3.3876061, y: 6.317851}
+  m_Direction: 0
 --- !u!1 &6521525897273481642
 GameObject:
   m_ObjectHideFlags: 0
