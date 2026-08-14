@@ -8,9 +8,9 @@ public class Leg : MonoBehaviour
     [SerializeField] private TargetJoint2D mouseTargetJoint;
 
     [Header("발이 마우스를 따라가는 힘")]
-    [SerializeField, Min(0f)] private float maxForce = 150f;
+    [SerializeField, Min(0f)] private float maxForce = 80f;
     [SerializeField, Range(0f, 1f)] private float dampingRatio = 1f;
-    [SerializeField, Min(0f)] private float frequency = 15f;
+    [SerializeField, Min(0f)] private float frequency = 20f;
     [SerializeField, Min(0f)] private float reachMargin = 0.1f;
 
     public float MaxForce
@@ -136,10 +136,19 @@ public class Leg : MonoBehaviour
 
     private void Update()
     {
-        if (followsMouse)
-        {
-            UpdateMouseTarget();
-        }
+        if (followsMouse == false)
+            return;
+
+        // 마우스가 게임 화면 안에 있는지 확인합니다.
+        Vector3 mousePos = Input.mousePosition;
+        bool cursorInWindow = Application.isFocused
+            && mousePos.x >= 0 && mousePos.x <= Screen.width
+            && mousePos.y >= 0 && mousePos.y <= Screen.height;
+
+        if (cursorInWindow == false)
+            return;
+
+        UpdateMouseTarget();
     }
 
     /// <summary>

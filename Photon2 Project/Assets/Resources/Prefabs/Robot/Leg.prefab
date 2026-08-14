@@ -49,9 +49,9 @@ MonoBehaviour:
   lowerLeg: {fileID: 5375208640919442800}
   foot: {fileID: 5111108184817306645}
   mouseTargetJoint: {fileID: 4448714062949288905}
-  maxForce: 150
+  maxForce: 80
   dampingRatio: 1
-  frequency: 15
+  frequency: 20
   reachMargin: 0.1
 --- !u!1 &6341143477235992921
 GameObject:
@@ -197,9 +197,9 @@ TargetJoint2D:
   m_Anchor: {x: 0, y: 0}
   m_Target: {x: 0, y: -2.315}
   m_AutoConfigureTarget: 1
-  m_MaxForce: 150
+  m_MaxForce: 80
   m_DampingRatio: 1
-  m_Frequency: 15
+  m_Frequency: 20
 --- !u!1 &6539924463262241428
 GameObject:
   m_ObjectHideFlags: 0

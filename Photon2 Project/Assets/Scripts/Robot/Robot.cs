@@ -9,6 +9,8 @@ public class Robot : MonoBehaviour
 
     private Rigidbody2D bodyRigidbody;
 
+    private readonly Vector3 cameraFollowOffset = new Vector3(0f, 0f, -10f);
+
     private void Awake()
     {
         Init();
@@ -28,6 +30,23 @@ public class Robot : MonoBehaviour
         leftArm.transform.localScale = new Vector3(-1, 1, 1);   // 좌우 반전
         GameObject rightArm = AttachLimb(armPrefab, "ShoulderRight");
         rightArm.transform.localScale = new Vector3(1, 1, 1);
+    }
+
+    private void Update()
+    {
+        // 테스트용 초기 위치 복귀
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            transform.position = Vector3.zero;
+            transform.rotation = Quaternion.identity;
+        }
+    }
+
+    private void LateUpdate()
+    {
+        // 로봇의 회전이 카메라에 영향을 주지 않도록 고정
+        Camera.main.transform.position = transform.position + cameraFollowOffset;
+        // TODO: 시네머신 카메라를 이용해서 카메라 영역 설정
     }
 
     private GameObject AttachLimb(GameObject limbPrefab, string attachmentPointName)
