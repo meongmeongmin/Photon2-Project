@@ -136,6 +136,7 @@ GameObject:
   - component: {fileID: 953159170882934796}
   - component: {fileID: 8433753919567642828}
   - component: {fileID: 6732870800243664779}
+  - component: {fileID: 8694307440535368585}
   m_Layer: 0
   m_Name: Robot
   m_TagString: Untagged
@@ -285,3 +286,23 @@ CapsuleCollider2D:
   m_Offset: {x: -0.108111024, y: -0.57934403}
   m_Size: {x: 3.5265484, y: 6.497934}
   m_Direction: 0
+--- !u!114 &8694307440535368585
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9167658305849211743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58f3a9dd6c8e4f1290a7b5432cf861ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Robot
+  armLeftPrefab: {fileID: 6129115811097649668, guid: add1ba96a0f141b43b6338511ad2dc69,
+    type: 3}
+  armRightPrefab: {fileID: 824467924803220666, guid: 61a34279a6efabe458ba703c65049edb,
+    type: 3}
+  legLeftPrefab: {fileID: 321472867865525664, guid: d9b7383ae2cb3ae4591dc7aed31e00e9,
+    type: 3}
+  legRightPrefab: {fileID: 321472867865525664, guid: b0b9a1142c177264498e8093b9544895,
+    type: 3}
