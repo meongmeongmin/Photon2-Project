@@ -8,10 +8,46 @@ public class Leg : MonoBehaviour
     [SerializeField] private TargetJoint2D mouseTargetJoint;
 
     [Header("발이 마우스를 따라가는 힘")]
-    [SerializeField, Min(0f)] private float maxForce = 1000f;
-    [SerializeField, Range(0f, 1f)] private float dampingRatio = 0.7f;  // 흔들림 억제
-    [SerializeField, Min(0f)] private float frequency = 5f;             // 목표를 따라가는 강도
-    [SerializeField, Min(0f)] private float reachMargin = 0.1f;         // 다리가 완전히 펴지지 않도록 남겨둘 거리
+    [SerializeField, Min(0f)] private float maxForce = 150f;
+    [SerializeField, Range(0f, 1f)] private float dampingRatio = 1f;
+    [SerializeField, Min(0f)] private float frequency = 15f;
+    [SerializeField, Min(0f)] private float reachMargin = 0.1f;
+
+    public float MaxForce
+    {
+        get => maxForce;
+        set
+        {
+            maxForce = Mathf.Max(0f, value);
+            mouseTargetJoint.maxForce = maxForce;
+        }
+    }
+
+    public float DampingRatio
+    {
+        get => dampingRatio;
+        set
+        {
+            dampingRatio = Mathf.Clamp01(value);
+            mouseTargetJoint.dampingRatio = dampingRatio;
+        }
+    }
+
+    public float Frequency
+    {
+        get => frequency;
+        set
+        {
+            frequency = Mathf.Max(0f, value);
+            mouseTargetJoint.frequency = frequency;
+        }
+    }
+
+    public float ReachMargin
+    {
+        get => reachMargin;
+        set => reachMargin = Mathf.Max(0f, value);
+    }
 
     // 마우스
     private Camera worldCamera;
@@ -45,12 +81,24 @@ public class Leg : MonoBehaviour
             mouseTargetJoint = lowerLeg.GetComponent<TargetJoint2D>();
             if (mouseTargetJoint == null)
                 mouseTargetJoint = lowerLeg.gameObject.AddComponent<TargetJoint2D>();
-        
-            mouseTargetJoint.enabled = followsMouse;
         }
+        
+        mouseTargetJoint.enabled = followsMouse;
 
         if (worldCamera == null)
             worldCamera = Camera.main;
+    }
+
+    private void OnValidate()   // 에디터에서만 적용
+    {
+        maxForce = Mathf.Max(0f, maxForce);
+        dampingRatio = Mathf.Clamp01(dampingRatio);
+        frequency = Mathf.Max(0f, frequency);
+        reachMargin = Mathf.Max(0f, reachMargin);
+
+        mouseTargetJoint.maxForce = maxForce;
+        mouseTargetJoint.dampingRatio = dampingRatio;
+        mouseTargetJoint.frequency = frequency;
     }
 
     public void SetMouseControl()
