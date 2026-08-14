@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1250121255249976937}
   - component: {fileID: 7306756254652195843}
   - component: {fileID: 1450768383126598602}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Upper
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -48,10 +48,10 @@ CapsuleCollider2D:
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   m_LayerOverridePriority: 0
   m_ForceSendLayers:
     serializedVersion: 2
@@ -135,7 +135,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6775744099431853733}
   - component: {fileID: 119364917068586300}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Sprite
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -225,7 +225,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2486534433995487386}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Arm
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -242,7 +242,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: -1, y: 1, z: 1}
+  m_LocalScale: {x: 0, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4989093508792464649}
@@ -259,7 +259,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2374585044563670932}
   - component: {fileID: 6810519630866438407}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Hand
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -297,7 +297,7 @@ CapsuleCollider2D:
     m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   m_LayerOverridePriority: 0
   m_ForceSendLayers:
     serializedVersion: 2
@@ -330,7 +330,7 @@ GameObject:
   - component: {fileID: 447552691249760688}
   - component: {fileID: 401960091044081429}
   - component: {fileID: 4622211371593580858}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Lower
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -367,10 +367,10 @@ CapsuleCollider2D:
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   m_LayerOverridePriority: 0
   m_ForceSendLayers:
     serializedVersion: 2
@@ -454,7 +454,7 @@ GameObject:
   m_Component:
   - component: {fileID: 9095122369401188389}
   - component: {fileID: 5811150281500786091}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Sprite
   m_TagString: Untagged
   m_Icon: {fileID: 0}

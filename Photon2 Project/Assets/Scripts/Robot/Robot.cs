@@ -7,7 +7,7 @@ public class Robot : MonoBehaviour
     [SerializeField] private GameObject armPrefab;
     [SerializeField] private GameObject legPrefab;
 
-    private Rigidbody2D rigidbody;
+    private Rigidbody2D bodyRigidbody;
 
     private void Awake()
     {
@@ -16,22 +16,26 @@ public class Robot : MonoBehaviour
 
     private void Init()
     {
-        rigidbody = GetComponent<Rigidbody2D>();
+        bodyRigidbody = GetComponent<Rigidbody2D>();
 
-        AttachLimb(armPrefab, "ShoulderLeft");
-        AttachLimb(armPrefab, "ShoulderRight");
-        armPrefab.transform.localScale = new Vector3(-1, 1, 1); // 좌우 반전
+        GameObject leftLeg = AttachLimb(legPrefab, "PelvisLeft");
+        SetMouseControl<Leg>(leftLeg);
 
-        AttachLimb(legPrefab, "PelvisLeft");
-        AttachLimb(legPrefab, "PelvisRight");
+        GameObject rightLeg = AttachLimb(legPrefab, "PelvisRight");
+        //SetMouseControl<Leg>(rightLeg);
+
+        GameObject leftArm = AttachLimb(armPrefab, "ShoulderLeft");
+        leftArm.transform.localScale = new Vector3(-1, 1, 1);   // 좌우 반전
+        GameObject rightArm = AttachLimb(armPrefab, "ShoulderRight");
+        rightArm.transform.localScale = new Vector3(1, 1, 1);
     }
 
-    private void AttachLimb(GameObject limbPrefab, string attachmentPointName)
+    private GameObject AttachLimb(GameObject limbPrefab, string attachmentPointName)
     {
         if (limbPrefab == null)
         {
             Debug.LogError($"{attachmentPointName}에 연결할 팔다리 프리팹이 없습니다.", this);
-            return;
+            return null;
         }
 
         Transform attachmentPoint = transform.Find(attachmentPointName);
@@ -39,15 +43,30 @@ public class Robot : MonoBehaviour
         if (attachmentPoint == null)
         {
             Debug.LogError($"Robot 아래에서 {attachmentPointName} 연결 위치를 찾지 못했습니다.", this);
-            return;
+            return null;
         }
 
         HingeJoint2D joint = limbPrefab.GetComponentInChildren<HingeJoint2D>();
-        joint.connectedBody = rigidbody;
+        joint.connectedBody = bodyRigidbody;
         joint.autoConfigureConnectedAnchor = false;
         joint.anchor = Vector2.zero;
-        joint.connectedAnchor = attachmentPoint.position;
+        joint.connectedAnchor = attachmentPoint.localPosition;
 
-        GameObject limb = Instantiate(limbPrefab, attachmentPoint, false);
+        return Instantiate(limbPrefab, attachmentPoint, false);
+    }
+
+    private void SetMouseControl<T>(GameObject limb) where T : Leg
+    {
+        if (limb == null)
+            return;
+
+        T limbComponent = limb.GetComponent<T>();
+        if (limbComponent == null)
+        {
+            Debug.LogError($"{limb.name}에서 {typeof(T).Name} 스크립트를 찾지 못했습니다.", limb);
+            return;
+        }
+
+        limbComponent.SetMouseControl();
     }
 }
