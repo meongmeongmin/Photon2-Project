@@ -7,7 +7,8 @@ public class Robot : MonoBehaviour
     [SerializeField] private GameObject armPrefab;
     [SerializeField] private GameObject legPrefab;
 
-    private Rigidbody2D bodyRigidbody;
+    private Rigidbody2D _rigidbody;
+    public Rigidbody2D Rigidbody => _rigidbody;
 
     private readonly Vector3 cameraFollowOffset = new Vector3(0f, 0f, -10f);
 
@@ -18,17 +19,17 @@ public class Robot : MonoBehaviour
 
     private void Init()
     {
-        bodyRigidbody = GetComponent<Rigidbody2D>();
+        _rigidbody = GetComponent<Rigidbody2D>();
 
-        GameObject leftLeg = AttachLimb(legPrefab, "PelvisLeft");
-        SetMouseControl<Leg>(leftLeg);
+        Leg leftLeg = AttachLimb<Leg>(legPrefab, "PelvisLeft");
+        SetMouseControl(leftLeg);
 
-        GameObject rightLeg = AttachLimb(legPrefab, "PelvisRight");
-        //SetMouseControl<Leg>(rightLeg);
+        Leg rightLeg = AttachLimb<Leg>(legPrefab, "PelvisRight");
+        //SetMouseControl(rightLeg);
 
-        GameObject leftArm = AttachLimb(armPrefab, "ShoulderLeft");
+        Arm leftArm = AttachLimb<Arm>(armPrefab, "ShoulderLeft");
         leftArm.transform.localScale = new Vector3(-1, 1, 1);   // 좌우 반전
-        GameObject rightArm = AttachLimb(armPrefab, "ShoulderRight");
+        Arm rightArm = AttachLimb<Arm>(armPrefab, "ShoulderRight");
         rightArm.transform.localScale = new Vector3(1, 1, 1);
     }
 
@@ -49,7 +50,7 @@ public class Robot : MonoBehaviour
         // TODO: 시네머신 카메라를 이용해서 카메라 영역 설정
     }
 
-    private GameObject AttachLimb(GameObject limbPrefab, string attachmentPointName)
+    private T AttachLimb<T>(GameObject limbPrefab, string attachmentPointName) where T : Limb
     {
         if (limbPrefab == null)
         {
@@ -58,7 +59,6 @@ public class Robot : MonoBehaviour
         }
 
         Transform attachmentPoint = transform.Find(attachmentPointName);
-
         if (attachmentPoint == null)
         {
             Debug.LogError($"Robot 아래에서 {attachmentPointName} 연결 위치를 찾지 못했습니다.", this);
@@ -66,26 +66,23 @@ public class Robot : MonoBehaviour
         }
 
         HingeJoint2D joint = limbPrefab.GetComponentInChildren<HingeJoint2D>();
-        joint.connectedBody = bodyRigidbody;
+        joint.connectedBody = _rigidbody;
         joint.autoConfigureConnectedAnchor = false;
         joint.anchor = Vector2.zero;
         joint.connectedAnchor = attachmentPoint.localPosition;
 
-        return Instantiate(limbPrefab, attachmentPoint, false);
+        T limb = Instantiate(limbPrefab, attachmentPoint, false).GetComponent<T>();
+        limb.SetInfo(this);
+        return limb;
     }
 
-    private void SetMouseControl<T>(GameObject limb) where T : Leg
+    private void SetMouseControl<T>(T limb) where T : Limb
     {
         if (limb == null)
-            return;
-
-        T limbComponent = limb.GetComponent<T>();
-        if (limbComponent == null)
         {
-            Debug.LogError($"{limb.name}에서 {typeof(T).Name} 스크립트를 찾지 못했습니다.", limb);
+            Debug.LogError($"생성한 프리팹에서 {typeof(T).Name} 스크립트를 찾지 못했습니다.", this);
             return;
         }
-
-        limbComponent.SetMouseControl();
+        limb.SetMouseControl();
     }
 }

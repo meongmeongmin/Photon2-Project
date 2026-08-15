@@ -46,13 +46,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6c1f274a9424f87be3613d8f24570ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Leg
-  lowerLeg: {fileID: 5375208640919442800}
-  foot: {fileID: 5111108184817306645}
-  mouseTargetJoint: {fileID: 4448714062949288905}
-  maxForce: 80
-  dampingRatio: 1
-  frequency: 20
-  reachMargin: 0.1
+  _maxForce: 80
+  _dampingRatio: 1
+  _frequency: 15
+  _bodyPullPreventionStrength: 1
 --- !u!1 &6341143477235992921
 GameObject:
   m_ObjectHideFlags: 0
@@ -176,10 +173,10 @@ HingeJoint2D:
   m_Motor:
     m_MotorSpeed: 0
     m_MaximumMotorForce: 10000
-  m_UseLimits: 0
+  m_UseLimits: 1
   m_AngleLimits:
     m_LowerAngle: 0
-    m_UpperAngle: 359
+    m_UpperAngle: 150
 --- !u!257 &4448714062949288905
 TargetJoint2D:
   m_ObjectHideFlags: 0
@@ -199,7 +196,7 @@ TargetJoint2D:
   m_AutoConfigureTarget: 1
   m_MaxForce: 80
   m_DampingRatio: 1
-  m_Frequency: 20
+  m_Frequency: 15
 --- !u!1 &6539924463262241428
 GameObject:
   m_ObjectHideFlags: 0
@@ -503,10 +500,10 @@ HingeJoint2D:
   m_Motor:
     m_MotorSpeed: 0
     m_MaximumMotorForce: 10000
-  m_UseLimits: 0
+  m_UseLimits: 1
   m_AngleLimits:
-    m_LowerAngle: 0
-    m_UpperAngle: 359
+    m_LowerAngle: -150
+    m_UpperAngle: 120
 --- !u!1 &9050961860763169353
 GameObject:
   m_ObjectHideFlags: 0
