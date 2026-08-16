@@ -11,13 +11,15 @@ public class Leg : Limb
     [SerializeField] private bool _showIkPreview = true;
     [SerializeField, Min(0.01f)] private float _previewPointRadius = 0.12f;
 
-    [Header("낮은 힘으로 관절 모터 시험")]
-    [SerializeField, Min(0f)] private float _testMaxMotorTorque = 50f;
-    [SerializeField, Min(0f)] private float _testAngleSpeed = 3f;
-    [SerializeField, Min(0f)] private float _testMaxMotorSpeed = 180f;
-    [SerializeField, Range(0f, 1f)] private float _testMotorDamping = 0.5f;
+    [Header("관절 모터 조절")]
+    [SerializeField] private bool _enableJointMotorTest = true;
+    [SerializeField, Min(0f)] private float _upperMaxMotorTorque = 220f;
+    [SerializeField, Min(0f)] private float _lowerMaxMotorTorque = 160f;
+    [SerializeField, Min(0f)] private float _testAngleSpeed = 5f;
+    [SerializeField, Min(0f)] private float _testMaxMotorSpeed = 300f;
+    [SerializeField, Range(0f, 1f)] private float _testMotorDamping = 0.7f;
+    [SerializeField, Min(0f)] private float _testMotorAcceleration = 720f;
     [SerializeField, Min(0f)] private float _testStopAngle = 0.75f;
-    [SerializeField, Range(-1, 1)] private int _motorSpeedDirection = -1;
 
     private bool _motorTestActive;
 
@@ -44,7 +46,7 @@ public class Leg : Limb
     {
         base.SetMouseControl(cursor);
 
-        if (_followsMouse)
+        if (_followsMouse && _enableJointMotorTest)
             StartJointMotorTest();
     }
 
@@ -58,14 +60,23 @@ public class Leg : Limb
         if (_followsMouse == false || _hasExpectedKneePosition == false)
             return;
 
+        if (_enableJointMotorTest == false)
+        {
+            if (_motorTestActive)
+                StopJointMotorTest();
+
+            return;
+        }
+
         if (_motorTestActive == false)
             StartJointMotorTest();
-        else if (_motorTestActive)
-            StopJointMotorTest();
+
+        if (_motorTestActive == false)
+            return;
 
         CalculateTargetJointAngles();
-        DriveJointMotor(_upperJoint, _targetUpperJointAngle);
-        DriveJointMotor(_lowerJoint, _targetLowerJointAngle);
+        DriveJointMotor(_upperJoint, _targetUpperJointAngle, _upperMaxMotorTorque);
+        DriveJointMotor(_lowerJoint, _targetLowerJointAngle, _lowerMaxMotorTorque);
     }
 
     private void StartJointMotorTest()
@@ -131,7 +142,8 @@ public class Leg : Limb
     /// </summary>
     /// <param name="joint">구동할 관절</param>
     /// <param name="targetAngle">목표 각도</param>
-    private void DriveJointMotor(HingeJoint2D joint, float targetAngle)
+    /// <param name="maxMotorTorque">이 관절이 사용할 수 있는 최대 힘</param>
+    private void DriveJointMotor(HingeJoint2D joint, float targetAngle, float maxMotorTorque)
     {
         float angleError = Mathf.DeltaAngle(joint.jointAngle, targetAngle);
         float desiredJointSpeed = 0f;
@@ -142,10 +154,15 @@ public class Leg : Limb
 
         desiredJointSpeed = Mathf.Clamp(desiredJointSpeed, -_testMaxMotorSpeed, _testMaxMotorSpeed);
 
-        int motorDirection = _motorSpeedDirection >= 0 ? 1 : -1;
         JointMotor2D motor = joint.motor;
-        motor.motorSpeed = desiredJointSpeed * motorDirection;
-        motor.maxMotorTorque = _testMaxMotorTorque;
+
+        // 목표 속도가 갑자기 바뀌어 관절이 튀지 않도록 서서히 속도를 변경합니다.
+        //motor.motorSpeed = Mathf.MoveTowards(
+        //    motor.motorSpeed,
+        //    desiredJointSpeed,
+        //    _testMotorAcceleration * Time.fixedDeltaTime);
+        motor.motorSpeed = desiredJointSpeed;
+        motor.maxMotorTorque = maxMotorTorque;
         joint.motor = motor;
         joint.useMotor = true;
     }

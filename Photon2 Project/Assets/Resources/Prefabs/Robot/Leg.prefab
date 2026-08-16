@@ -58,12 +58,14 @@ MonoBehaviour:
   _bodyPullPreventionStrength: 1
   _showIkPreview: 1
   _previewPointRadius: 0.12
-  _testMaxMotorTorque: 50
-  _testAngleSpeed: 3
-  _testMaxMotorSpeed: 180
-  _testMotorDamping: 0.5
+  _enableJointMotorTest: 1
+  _upperMaxMotorTorque: 320
+  _lowerMaxMotorTorque: 240
+  _testAngleSpeed: 9
+  _testMaxMotorSpeed: 450
+  _testMotorDamping: 0.7
+  _testMotorAcceleration: 2000
   _testStopAngle: 0.75
-  _motorSpeedDirection: -1
 --- !u!1 &6341143477235992921
 GameObject:
   m_ObjectHideFlags: 0
@@ -198,7 +200,7 @@ TargetJoint2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6341143477235992921}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 4
   m_EnableCollision: 1
   m_ConnectedRigidBody: {fileID: 0}
