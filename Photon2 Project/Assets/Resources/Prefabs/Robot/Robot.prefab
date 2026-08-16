@@ -302,3 +302,5 @@ MonoBehaviour:
     type: 3}
   legPrefab: {fileID: 321472867865525664, guid: d9b7383ae2cb3ae4591dc7aed31e00e9,
     type: 3}
+  _cursorPrefab: {fileID: 4131317912366014526, guid: 3a18b46c0866c6b4e81d9a740a395219,
+    type: 3}

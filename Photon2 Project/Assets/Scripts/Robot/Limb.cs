@@ -24,8 +24,8 @@ public abstract class Limb : MonoBehaviour
     /// </summary>
     protected float _maxReach;
 
-    protected Camera _worldCamera;
     protected bool _followsMouse = false;
+    protected Cursor _cursor;
 
     [Header("손/발이 마우스를 따라가는 힘")]
     [SerializeField, Min(0f)] protected float _maxForce = 80f;
@@ -95,9 +95,6 @@ public abstract class Limb : MonoBehaviour
         MaxForce = _maxForce;
         DampingRatio = _dampingRatio;
         Frequency = _frequency;
-
-        if (_worldCamera == null)
-            _worldCamera = Camera.main;
     }
 
     public virtual void SetInfo(Robot body)
@@ -105,13 +102,16 @@ public abstract class Limb : MonoBehaviour
         _body = body;
     }
 
-    public virtual void SetMouseControl()
+    public virtual void SetMouseControl(Cursor cursor)
     {
         if (TryPrepareMouseTargetJoint() == false)
         {
             _followsMouse = false;
             return;
         }
+
+        _cursor = cursor;
+        _cursor.SetInfo(_maxReach, transform, _endEffector);
 
         _followsMouse = true;
         _mouseTargetJoint.enabled = true;
@@ -120,18 +120,6 @@ public abstract class Limb : MonoBehaviour
 
     private void Update()
     {
-        if (_followsMouse == false)
-            return;
-
-        // 마우스가 게임 화면 안에 있는지 확인합니다.
-        Vector3 mousePos = Input.mousePosition;
-        bool cursorInWindow = Application.isFocused
-            && mousePos.x >= 0 && mousePos.x <= Screen.width
-            && mousePos.y >= 0 && mousePos.y <= Screen.height;
-
-        if (cursorInWindow == false)
-            return;
-
         UpdateMouseTarget();
     }
 
@@ -182,15 +170,14 @@ public abstract class Limb : MonoBehaviour
     }
 
     /// <summary>
-    /// 마우스를 따라 손/발 이동 위치를 업데이트합니다. (마우스 화면 좌표 -> 게임 월드 좌표)
+    /// 마우스를 따라 손/발 이동 위치를 업데이트합니다.
     /// </summary>
     protected void UpdateMouseTarget()
     {
-        Vector3 screenPosition = Input.mousePosition;
-        screenPosition.z = Mathf.Abs(_worldCamera.transform.position.z - _lower.transform.position.z);
+        if (_followsMouse == false || _cursor.CursorInWindow == false)
+            return;
 
-        Vector3 worldPosition = _worldCamera.ScreenToWorldPoint(screenPosition);
-        Vector2 targetPosition = new Vector2(worldPosition.x, worldPosition.y);
+        Vector2 targetPosition = _cursor.UpdatePosition();
         _mouseTargetJoint.target = ClampTargetToReach(targetPosition);
     }
 

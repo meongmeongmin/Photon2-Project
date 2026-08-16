@@ -44,5 +44,8 @@ TagManager:
   - name: Robot
     uniqueID: 1792612053
     locked: 0
+  - name: Cursor
+    uniqueID: 2105863869
+    locked: 0
   m_RenderingLayers:
   - Default

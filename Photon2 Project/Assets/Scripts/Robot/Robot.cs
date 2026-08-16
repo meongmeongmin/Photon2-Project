@@ -10,6 +10,9 @@ public class Robot : MonoBehaviour
     private Rigidbody2D _rigidbody;
     public Rigidbody2D Rigidbody => _rigidbody;
 
+    [Header("커서 프리팹")]
+    [SerializeField] private GameObject _cursorPrefab;
+
     private readonly Vector3 cameraFollowOffset = new Vector3(0f, 0f, -10f);
 
     private void Awake()
@@ -83,6 +86,8 @@ public class Robot : MonoBehaviour
             Debug.LogError($"생성한 프리팹에서 {typeof(T).Name} 스크립트를 찾지 못했습니다.", this);
             return;
         }
-        limb.SetMouseControl();
+
+        Cursor c = Instantiate(_cursorPrefab).GetComponent<Cursor>();
+        limb.SetMouseControl(c);
     }
 }
