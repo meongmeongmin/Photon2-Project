@@ -262,6 +262,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b70ba1d9871f394a83036570f21246d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Arm
+  _targetUpperJointAngle: 0
+  _targetLowerJointAngle: 0
+  _expectedLowerPosition: {x: 0, y: 0}
+  _preferredLowerDirection: 1
+  _reachableTargetPosition: {x: 0, y: 0}
+  _maxReachRatio: 0.97
   _maxForce: 80
   _dampingRatio: 1
   _frequency: 15

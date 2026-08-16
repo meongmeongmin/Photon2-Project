@@ -10,19 +10,36 @@ public abstract class Limb : MonoBehaviour
 {
     protected LimbType _type;
 
+    protected Robot _body;
+
+    #region 어깨/골반 & 팔꿈치/무릎
+    protected Rigidbody2D _upper;
     protected Rigidbody2D _lower;
+    protected HingeJoint2D _upperJoint;
+    protected HingeJoint2D _lowerJoint;
+    protected float _upperLength;
+    protected float _lowerLength;
+    [SerializeField] protected float _targetUpperJointAngle;
+    [SerializeField] protected float _targetLowerJointAngle;
+    [SerializeField] protected Vector2 _expectedLowerPosition;
+    [SerializeField, Range(-1, 1)] protected int _preferredLowerDirection = 1;
+    #endregion
+
     /// <summary>
     /// 손/발의 중심점
     /// </summary>
     protected Transform _endEffector;
     protected Collider2D _endEffectorCollider;
+    [SerializeField] protected Vector2 _reachableTargetPosition;
     protected TargetJoint2D _mouseTargetJoint;
 
-    protected Robot _body;
     /// <summary>
     /// 어깨/골반 ~ 손/발 거리를 팔/다리가 닿을 수 있는 최대 길이
     /// </summary>
     protected float _maxReach;
+
+    [Header("팔/다리를 완전히 펴지 않도록 남기는 여유")]
+    [SerializeField, Range(0.8f, 0.999f)] protected float _maxReachRatio = 0.97f;
 
     protected bool _followsMouse = false;
     protected Cursor _cursor;
@@ -80,9 +97,14 @@ public abstract class Limb : MonoBehaviour
     protected virtual void Init()
     {
         _lower = transform.Find("Lower")?.GetComponent<Rigidbody2D>();
+        _upper = transform.Find("Upper")?.GetComponent<Rigidbody2D>();
+        _upperJoint = _upper?.GetComponent<HingeJoint2D>();
+        _lowerJoint = _lower.GetComponent<HingeJoint2D>();
+
         _endEffector = _type == LimbType.Leg ? _lower?.transform.Find("Foot") : _lower?.transform.Find("Hand");
         _endEffectorCollider = _endEffector.GetComponent<Collider2D>();
 
+        MeasureLengths();
         _maxReach = Vector2.Distance(transform.position, _endEffector.position);
 
         _mouseTargetJoint = _lower.GetComponent<TargetJoint2D>();
@@ -104,11 +126,11 @@ public abstract class Limb : MonoBehaviour
 
     public virtual void SetMouseControl(Cursor cursor)
     {
-        if (TryPrepareMouseTargetJoint() == false)
-        {
-            _followsMouse = false;
-            return;
-        }
+        //if (TryPrepareMouseTargetJoint() == false)
+        //{
+        //    _followsMouse = false;
+        //    return;
+        //}
 
         _cursor = cursor;
         _cursor.SetInfo(_maxReach, transform, _endEffector);
@@ -125,10 +147,19 @@ public abstract class Limb : MonoBehaviour
 
     private void FixedUpdate()
     {
+        OnLimbFixedUpdate();
+
         if (_followsMouse == false || _mouseTargetJoint == null || _mouseTargetJoint.enabled == false || _endEffector == null)
             return;
 
-        CancelMouseForceOnWholeRobot();
+        //CancelMouseForceOnWholeRobot();
+    }
+
+    /// <summary>
+    /// 하위 클래스가 물리 갱신에 맞춰 시험 동작을 실행할 수 있게 합니다.
+    /// </summary>
+    protected virtual void OnLimbFixedUpdate()
+    {
     }
 
     private void CancelMouseForceOnWholeRobot()
@@ -178,7 +209,16 @@ public abstract class Limb : MonoBehaviour
             return;
 
         Vector2 targetPosition = _cursor.UpdatePosition();
-        _mouseTargetJoint.target = ClampTargetToReach(targetPosition);
+        Vector2 limitedTargetPosition = ClampTargetToReach(targetPosition);
+        //_mouseTargetJoint.target = limitedTargetPosition;
+        OnMouseTargetUpdated(limitedTargetPosition);
+    }
+
+    /// <summary>
+    /// 제한된 손/발 목표가 갱신됐을 때 하위 클래스에 알려줍니다.
+    /// </summary>
+    protected virtual void OnMouseTargetUpdated(Vector2 targetPosition)
+    {
     }
 
     /// <summary>
@@ -188,32 +228,53 @@ public abstract class Limb : MonoBehaviour
     /// <returns>제한된 목표 위치</returns>
     protected Vector2 ClampTargetToReach(Vector2 targetPosition)
     {
-        Vector2 limbRootPosition = transform.position;
+        Vector2 limbRootPosition = transform.position;  // 어깨/골반 위치
         Vector2 limbRootToTarget = targetPosition - limbRootPosition;
 
         float targetDistance = limbRootToTarget.magnitude;
         Vector2 targetDirection = limbRootToTarget.normalized;
+        float allowedReach = _maxReach * Mathf.Clamp(_maxReachRatio, 0.8f, 0.999f);
 
-        // 마우스가 팔/다리 범위 안에 있으면 그대로 따라감
-        if (targetDistance <= _maxReach)
+        // 완전히 일직선이 되기 전까지는 마우스 목표를 그대로 사용합니다.
+        if (targetDistance <= allowedReach)
         {
             return targetPosition;
         }
 
-        Vector2 endEffectorPos = _endEffector.transform.position;
-        float currentReach = Vector2.Distance(limbRootPosition, endEffectorPos);    // 어깨/골반 ~ 손/발 현재 길이
-        float extensionThreshold = _maxReach * 0.99f;   // 거의 완전히 펴졌다고 판단할 아주 작은 여유
-
-        // 아직 팔/다리가 덜 펴졌다면 최대 길이까지 빠르게 뻗도록 함
-        float allowedReach = _maxReach * 0.97f;
-        if (currentReach < extensionThreshold)
-        {
-            return limbRootPosition + targetDirection * allowedReach;
-        }
-
-        // 이미 거의 완전히 펴졌다면 현재 길이를 유지하면서 마우스 방향만 따라감.
-        // 즉 바깥쪽으로 더 당기는 힘은 만들지 않지만 마우스가 좌우로 움직이면 손/발은 계속 따라갈 수 있음.
-        float radius = Mathf.Min(currentReach, allowedReach);
-        return limbRootPosition + targetDirection * radius;
+        // 범위를 벗어나면 항상 여유를 남긴 최대 길이까지만 허용합니다.
+        return limbRootPosition + targetDirection * allowedReach;
     }
+
+    #region Utilities
+    protected void MeasureLengths()
+    {
+        _upperLength = Vector2.Distance(transform.position, _lower.position);
+        _lowerLength = Vector2.Distance(_lower.position, _endEffector.position);
+    }
+
+    protected static void SetJointMotorEnabled(HingeJoint2D joint, bool enabled)
+    {
+        if (joint == null)
+            return;
+
+        JointMotor2D motor = joint.motor;
+        motor.motorSpeed = 0f;
+        joint.motor = motor;
+        joint.useMotor = enabled;
+    }
+
+    protected static float ClampToJointLimits(HingeJoint2D joint, float angle)
+    {
+        if (joint.useLimits == false)
+            return Mathf.DeltaAngle(0f, angle);
+
+        JointAngleLimits2D limits = joint.limits;
+        return Mathf.Clamp(angle, limits.min, limits.max);
+    }
+
+    protected static float GetDirectionAngle(Vector2 direction)
+    {
+        return Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+    }
+    #endregion
 }

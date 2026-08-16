@@ -46,10 +46,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6c1f274a9424f87be3613d8f24570ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Leg
+  _targetUpperJointAngle: 0
+  _targetLowerJointAngle: 0
+  _expectedLowerPosition: {x: 0, y: 0}
+  _preferredLowerDirection: 1
+  _reachableTargetPosition: {x: 0, y: 0}
+  _maxReachRatio: 0.97
   _maxForce: 80
   _dampingRatio: 1
   _frequency: 15
   _bodyPullPreventionStrength: 1
+  _showIkPreview: 1
+  _previewPointRadius: 0.12
+  _testMaxMotorTorque: 50
+  _testAngleSpeed: 3
+  _testMaxMotorSpeed: 180
+  _testMotorDamping: 0.5
+  _testStopAngle: 0.75
+  _motorSpeedDirection: -1
 --- !u!1 &6341143477235992921
 GameObject:
   m_ObjectHideFlags: 0
