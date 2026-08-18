@@ -262,16 +262,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b70ba1d9871f394a83036570f21246d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Arm
-  _targetUpperJointAngle: 0
-  _targetLowerJointAngle: 0
-  _expectedLowerPosition: {x: 0, y: 0}
-  _preferredLowerDirection: 1
-  _reachableTargetPosition: {x: 0, y: 0}
+  _defalutMidJointDirection: 1
   _maxReachRatio: 0.97
-  _maxForce: 80
-  _dampingRatio: 1
-  _frequency: 15
-  _bodyPullPreventionStrength: 1
+  _rootJointMaxMotorTorque: 450
+  _midJointMaxMotorTorque: 320
+  _angleSpeed: 20
+  _maxMotorSpeed: 1080
+  _motorDamping: 0.7
+  _stopAngle: 0.35
 --- !u!1 &6173205413588643797
 GameObject:
   m_ObjectHideFlags: 0
