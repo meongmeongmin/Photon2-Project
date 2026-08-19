@@ -46,13 +46,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6c1f274a9424f87be3613d8f24570ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Leg
-  _defalutMidJointDirection: 1
   _maxReachRatio: 0.97
   _rootJointMaxMotorTorque: 450
   _midJointMaxMotorTorque: 320
   _angleSpeed: 20
   _maxMotorSpeed: 1080
-  _motorDamping: 0.7
+  _motorDamping: 1
   _stopAngle: 0.35
 --- !u!1 &6341143477235992921
 GameObject:

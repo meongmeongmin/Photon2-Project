@@ -28,7 +28,7 @@ public class Leg : Limb
         Handles.DrawWireDisc(hipPosition, Vector3.forward, _upperLength);
 
         Handles.color = new Color(1f, 0.35f, 0.15f, 0.65f);
-        Handles.DrawWireDisc(_endEffectorPosition, Vector3.forward, _lowerLength);
+        Handles.DrawWireDisc(_targetEndEffectorPosition, Vector3.forward, _lowerLength);
 
         // 현재 실제 다리는 하늘색으로 표시합니다.
         Gizmos.color = new Color(0.15f, 0.85f, 1f, 0.8f);
@@ -39,16 +39,16 @@ public class Leg : Limb
         // 계산된 예상 다리는 노란색으로 표시합니다.
         Handles.color = new Color(1f, 0.85f, 0.1f, 1f);
         Handles.DrawLine(hipPosition, _midJointPosition, 3f);
-        Handles.DrawLine(_midJointPosition, _endEffectorPosition, 3f);
+        Handles.DrawLine(_midJointPosition, _targetEndEffectorPosition, 3f);
         Handles.DrawSolidDisc(_midJointPosition, Vector3.forward, pointRadius);
 
         Handles.color = new Color(1f, 0.25f, 0.2f, 1f);
-        Handles.DrawSolidDisc(_endEffectorPosition, Vector3.forward, pointRadius);
+        Handles.DrawSolidDisc(_targetEndEffectorPosition, Vector3.forward, pointRadius);
 
         Handles.Label(hipPosition + Vector2.up * pointRadius, $"골반\n허벅지: {_upperLength:F2}");
         Handles.Label(_midJointPosition + Vector2.up * pointRadius, "예상 무릎");
         Handles.Label(currentMidJointPosition + Vector2.right * pointRadius, "현재 무릎");
-        Handles.Label(_endEffectorPosition + Vector2.up * pointRadius, $"발 목표\n종아리: {_lowerLength:F2}");
+        Handles.Label(_targetEndEffectorPosition + Vector2.up * pointRadius, $"발 목표\n종아리: {_lowerLength:F2}");
     }
 #endif
 }

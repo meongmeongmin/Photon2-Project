@@ -7,11 +7,21 @@ public class Robot : MonoBehaviour
     [SerializeField] private GameObject armPrefab;
     [SerializeField] private GameObject legPrefab;
 
+    [Header("커서 프리팹")]
+    [SerializeField] private GameObject _cursorPrefab;
+
+    /// <summary>
+    /// 몸통 방향 (좌: -1, 우: 1)
+    /// </summary>
+    public int Direction { get; set; } = 1;
+
     private Rigidbody2D _rigidbody;
     public Rigidbody2D Rigidbody => _rigidbody;
 
-    [Header("커서 프리팹")]
-    [SerializeField] private GameObject _cursorPrefab;
+    private Leg _leftLeg;
+    private Leg _rightLeg;
+    private Arm _leftArm;
+    private Arm _rightArm;
 
     private readonly Vector3 cameraFollowOffset = new Vector3(0f, 0f, -10f);
 
@@ -24,16 +34,19 @@ public class Robot : MonoBehaviour
     {
         _rigidbody = GetComponent<Rigidbody2D>();
 
-        Leg leftLeg = AttachLimb<Leg>(legPrefab, "PelvisLeft");
-        SetMouseControl(leftLeg);
+        _leftLeg = AttachLimb<Leg>(legPrefab, "PelvisLeft");
+        SetMouseControl(_leftLeg);
 
-        Leg rightLeg = AttachLimb<Leg>(legPrefab, "PelvisRight");
-        //SetMouseControl(rightLeg);
+        _rightLeg = AttachLimb<Leg>(legPrefab, "PelvisRight");
+        //SetMouseControl(_rightLeg);
 
-        Arm leftArm = AttachLimb<Arm>(armPrefab, "ShoulderLeft");
-        leftArm.transform.localScale = new Vector3(-1, 1, 1);   // 좌우 반전
-        Arm rightArm = AttachLimb<Arm>(armPrefab, "ShoulderRight");
-        rightArm.transform.localScale = new Vector3(1, 1, 1);
+        _leftArm = AttachLimb<Arm>(armPrefab, "ShoulderLeft");
+        _leftArm.transform.localScale = new Vector3(-1, 1, 1);   // 좌우 반전
+        //SetMouseControl(_leftArm);
+
+        _rightArm = AttachLimb<Arm>(armPrefab, "ShoulderRight");
+        _rightArm.transform.localScale = new Vector3(1, 1, 1);
+        //SetMouseControl(_rightArm);
     }
 
     private void Update()
@@ -68,25 +81,25 @@ public class Robot : MonoBehaviour
             return null;
         }
 
-        HingeJoint2D joint = limbPrefab.GetComponentInChildren<HingeJoint2D>();
-        joint.connectedBody = _rigidbody;
-        joint.autoConfigureConnectedAnchor = false;
-        joint.anchor = Vector2.zero;
-        joint.connectedAnchor = attachmentPoint.localPosition;
-
         T limb = Instantiate(limbPrefab, attachmentPoint, false).GetComponent<T>();
-        limb.SetInfo(this);
+        if (limb == null)
+        {
+            Debug.LogError($"생성한 프리팹에서 {typeof(T).Name} 스크립트를 찾지 못했습니다.", this);
+            return null;
+        }
+
+        HingeJoint2D rootJoint = limb.GetComponentInChildren<HingeJoint2D>();
+        rootJoint.connectedBody = _rigidbody;
+        rootJoint.autoConfigureConnectedAnchor = false;
+        rootJoint.anchor = Vector2.zero;
+        rootJoint.connectedAnchor = attachmentPoint.localPosition;
+
+        limb.SetInfo(this, rootJoint);
         return limb;
     }
 
     private void SetMouseControl<T>(T limb) where T : Limb
     {
-        if (limb == null)
-        {
-            Debug.LogError($"생성한 프리팹에서 {typeof(T).Name} 스크립트를 찾지 못했습니다.", this);
-            return;
-        }
-
         Cursor c = Instantiate(_cursorPrefab).GetComponent<Cursor>();
         limb.SetMouseControl(c);
     }

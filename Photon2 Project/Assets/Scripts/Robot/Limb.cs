@@ -1,6 +1,3 @@
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 using UnityEngine;
 
 public enum LimbType
@@ -12,6 +9,7 @@ public enum LimbType
 public abstract class Limb : MonoBehaviour
 {
     protected LimbType _type;
+
     protected Robot _body;
 
     #region 어깨/골반 & 팔꿈치/무릎
@@ -41,19 +39,13 @@ public abstract class Limb : MonoBehaviour
 
     // 목표 위치
     protected Vector2 _midJointPosition;
-
+    /// <summary>
+    /// 팔꿈치/무릎 방향 (좌: -1, 우: 1)
+    /// </summary>
     protected int _midJointDirection;
-    /// <summary>
-    /// // 일직선일 때 사용할 기본 팔꿈치/무릎 방향 (->)
-    /// </summary>
-    protected int _defalutMidJointDirection = 1;
 
     /// <summary>
-    /// 좌우 반전된 팔/다리에서 화면 방향과 관절 각도 방향을 맞추는 값
-    /// </summary>
-    protected float _jointAngleToVisibleAngleSign = 1f;
-    /// <summary>
-    /// 몸통을 기준으로 본 윗팔/허벅지 방향
+    /// 몸통에 비해서 허벅지가 몇 도 꺾여 있는가
     /// </summary>
     protected float _initialRootJointAngleFromBody;
     /// <summary>
@@ -68,13 +60,19 @@ public abstract class Limb : MonoBehaviour
     /// </summary>
     protected Transform _endEffector;
     protected Collider2D _endEffectorCollider;
-    protected Vector2 _endEffectorPosition;
+    protected Vector2 _targetEndEffectorPosition;   // 목표 위치
     #endregion
 
     /// <summary>
     /// 어깨/골반 ~ 손/발 길이
     /// </summary>
     protected float _maxReach;
+
+    /// <summary>
+    /// 오브젝트를 뒤집으면 화면상 보이는 회전 방향과 Joint의 물리적인 각도 부호가 반대로 보일 수 있기 때문에,
+    /// 좌우 반전된 팔/다리에서 화면 방향과 관절 각도 방향을 맞추는 값
+    /// </summary>
+    protected float _jointAngleToVisibleAngleSign = 1f;
 
     protected bool _followsMouse = false;
     protected Cursor _cursor;
@@ -87,7 +85,7 @@ public abstract class Limb : MonoBehaviour
     [SerializeField, Min(0f)] protected float _midJointMaxMotorTorque = 320f;   // 팔꿈치/무릎 관절이 낼 수 있는 최대 힘
     [SerializeField, Min(0f)] protected float _angleSpeed = 20f;                // 남은 각도에 따라 모터 속도를 얼마나 크게 만들지 결정 => 목표 각도에 가까워질수록 속도는 줄어든다
     [SerializeField, Min(0f)] protected float _maxMotorSpeed = 1080f;           // 관절이 회전할 수 있는 최대 목표 속도
-    [SerializeField, Range(0f, 1f)] protected float _motorDamping = 0.7f;       // 현재 회전 속도를 이용해 지나치게 빠른 움직임과 떨림을 줄이는 값
+    [SerializeField, Range(0f, 1f)] protected float _motorDamping = 1f;         // 현재 회전 속도를 이용해 지나치게 빠른 움직임과 떨림을 줄이는 값
     [SerializeField, Min(0f)] protected float _stopAngle = 0.35f;               // 남은 각도가 이 값보다 작으면 모터를 정지
 
     private void Awake()
@@ -97,10 +95,10 @@ public abstract class Limb : MonoBehaviour
 
     protected virtual void Init()
     {
-        _lower = transform.Find("Lower")?.GetComponent<Rigidbody2D>();
         _upper = transform.Find("Upper")?.GetComponent<Rigidbody2D>();
+        _lower = transform.Find("Lower")?.GetComponent<Rigidbody2D>();
 
-        _rootJoint = _upper?.GetComponent<HingeJoint2D>();
+        _rootJoint = _upper.GetComponent<HingeJoint2D>();
         _midJoint = _lower.GetComponent<HingeJoint2D>();
 
         _endEffector = _type == LimbType.Leg ? _lower?.transform.Find("Foot") : _lower?.transform.Find("Hand");
@@ -113,6 +111,10 @@ public abstract class Limb : MonoBehaviour
         CalculateMidJointDirection(_endEffector.position);
     }
 
+    /// <summary>
+    /// 팔꿈치/무릎 굽힘 방향을 결정합니다.
+    /// </summary>
+    /// <param name="endEffectorPosition"></param>
     protected void CalculateMidJointDirection(Vector2 endEffectorPosition)
     {
         Vector2 rootJointPosition = transform.position;
@@ -120,6 +122,13 @@ public abstract class Limb : MonoBehaviour
         Vector2 rootToMid = _lower.position - rootJointPosition;
 
         // 어깨/골반에서 손/발을 바라봤을 때 현재 팔꿈치/무릎이 어느 쪽에 있는지 확인합니다.
+        //           + 방향
+        //             ● 무릎
+        //             |
+        //골반 ●────────────> 발
+        //             |
+        //             ● 무릎
+        //           - 방향
         float currentMidSide = (rootToEnd.x * rootToMid.y) - (rootToEnd.y * rootToMid.x);
         if (Mathf.Abs(currentMidSide) > 0.001f)
         {
@@ -127,13 +136,14 @@ public abstract class Limb : MonoBehaviour
             return;
         }
 
-        // 다리가 일직선이라 방향을 판단할 수 없으면 기본 방향을 사용합니다.
-        _midJointDirection = _defalutMidJointDirection >= 0 ? 1 : -1;
+        // 다리가 일직선이라(쫙 펴진 상태) 방향을 판단할 수 없으면 몸통이 바라보는 방향을 사용합니다.
+        _midJointDirection = _body.Direction >= 0 ? 1 : -1;
     }
 
-    public virtual void SetInfo(Robot body)
+    public void SetInfo(Robot body, HingeJoint2D rootJoint)
     {
         _body = body;
+        _rootJoint = rootJoint;
     }
 
     public virtual void SetMouseControl(Cursor cursor)
@@ -155,11 +165,17 @@ public abstract class Limb : MonoBehaviour
         Vector2 midJointDirection = (Vector2)_endEffector.position - _lower.position;
         float bodyRotation = _rootJoint.connectedBody.rotation;
 
-        _initialRootJointAngle = _rootJoint.jointAngle;
-        _initialMidJointAngle = _midJoint.jointAngle;
-        _initialRootJointAngleFromBody = GetDirectionAngle(rootJointDirection) - bodyRotation;
-        _initialMidJointBendAngle = Vector2.SignedAngle(rootJointDirection, midJointDirection);
+        // 초기 자세 설정
+        {
+            _initialRootJointAngle = _rootJoint.jointAngle;
+            _initialMidJointAngle = _midJoint.jointAngle;
+            // 몸통에 비해서 허벅지가 몇 도 꺾여 있는가
+            _initialRootJointAngleFromBody = GetDirectionAngle(rootJointDirection) - bodyRotation;
+            // 팔꿈치/무릎 관절이 현재 어느 방향으로 얼마나 꺾여 있는지
+            _initialMidJointBendAngle = Vector2.SignedAngle(rootJointDirection, midJointDirection);
+        }
 
+        // 오브젝트를 뒤집으면 화면상 보이는 회전 방향과 Joint의 물리적인 각도 부호가 반대로 보일 수 있기 때문
         Vector3 scale = transform.lossyScale;
         _jointAngleToVisibleAngleSign = scale.x * scale.y < 0f ? -1f : 1f;
 
@@ -175,7 +191,7 @@ public abstract class Limb : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (_followsMouse == false || _endEffector == null)
+        if (_followsMouse == false)
             return;
 
         CalculateTargetJointAngles();
@@ -191,12 +207,12 @@ public abstract class Limb : MonoBehaviour
         if (_followsMouse == false || _cursor.CursorInWindow == false)
             return;
 
-        // 손/발 업데이트
+        // 목표 손/발 위치 업데이트
         Vector2 targetPosition = _cursor.UpdatePosition();
         var (limitedTargetPosition, targetDirection, targetDistance) = ClampTarget(targetPosition);
-        _endEffectorPosition = limitedTargetPosition;
+        _targetEndEffectorPosition = limitedTargetPosition;
 
-        // 팔/다리 업데이트
+        // 목표 팔/다리 위치 업데이트
         CalculateMidJointPosition(limitedTargetPosition, targetDirection, targetDistance);
     }
 
@@ -239,38 +255,39 @@ public abstract class Limb : MonoBehaviour
     protected void CalculateMidJointPosition(Vector2 targetPosition, Vector2 targetDirection, float targetDistance)
     {
         // 어깨/골반에서 손/발 방향으로 얼마나 이동한 곳에서 무릎이 갈라지는지 계산합니다.
-        //       MidJoint
-        //        ●
-        //       /|\
-        //      / | \
-        //   a /  |  \ b
-        //    /   |   \
-        //Hip ●---●----● Foot
-        //    alongTarget
+        //                   MidJoint
+        //                    ●
+        //                   /|\
+        //                  / | \
+        //           upper /  |  \ lower
+        //                /   |   \
+        //      rootJoint ●---●----● EndJoint
+        //                alongTarget
         float alongTarget = ((_upperLength * _upperLength) - (_lowerLength * _lowerLength) + (targetDistance * targetDistance))
-            / (2f * targetDistance); // 어깨/골반 ~ 손/발 무릎 후보의 가운데 지점
+            / (2f * targetDistance); // 어깨/골반 ~ 손/발 무릎 후보의 가운데 지점 길이
 
-        //        MidJoint
-        //         ●
-        //        /|
-        //       / |
-        //upper /  | sidewaysDistance
-        //     /   |
-        //Hip ●----● midJointCenter
-        //   alongTarget
-        float sidewaysDistanceSquared = _upperLength * _upperLength - alongTarget * alongTarget;
+        //                  MidJoint
+        //                   ●
+        //                  /|
+        //                 / |
+        //          upper /  | sidewaysDistance
+        //               /   |
+        //    rootJoint ●----● midJointCenter
+        //             alongTarget
+        float sidewaysDistanceSquared = (_upperLength * _upperLength) - (alongTarget * alongTarget);
         float sidewaysDistance = Mathf.Sqrt(Mathf.Max(0f, sidewaysDistanceSquared));
         Vector2 rootJointPosition = transform.position;  // 어깨/골반 위치
         Vector2 midJointCenter = rootJointPosition + (targetDirection * alongTarget);
-        Vector2 sidewaysDirection = new Vector2(-targetDirection.y, targetDirection.x); // 90도 회전
 
-        // 무릎 예상 위치 후보 두 개를 계산합니다. (좌우 대칭)
+        // 무릎 후보 두 점이 골반-발 선에 수직인 방향이므로 90도 회전
+        Vector2 sidewaysDirection = new Vector2(-targetDirection.y, targetDirection.x);
+
+        // 팔꿈치/무릎 예상 위치 후보 두 개를 계산합니다. (좌우 대칭)
         Vector2 firstMidJointPosition = midJointCenter + (sidewaysDirection * sidewaysDistance);
         Vector2 secondMidJointPosition = midJointCenter - (sidewaysDirection * sidewaysDistance);
 
-        // 시작할 때 선택한 굽힘 방향을 계속 사용해 일직선 근처에서도 반대편으로 뒤집히지 않게 합니다.
-        bool useFirstPosition = _midJointDirection >= 0;
-        _midJointPosition = useFirstPosition ? firstMidJointPosition : secondMidJointPosition;
+        // 일직선 근처에서도 반대편으로 뒤집히지 않게 합니다.
+        _midJointPosition = _midJointDirection >= 0 ? firstMidJointPosition : secondMidJointPosition;
     }
 
     /// <summary>
@@ -280,7 +297,7 @@ public abstract class Limb : MonoBehaviour
     {
         Vector2 rootJointPosition = transform.position;
         Vector2 rootJointDirection = _midJointPosition - rootJointPosition;
-        Vector2 midJointDirection = _endEffectorPosition - _midJointPosition;
+        Vector2 midJointDirection = _targetEndEffectorPosition - _midJointPosition;
         float bodyRotation = _rootJoint.connectedBody.rotation;
 
         float rootJointAngleFromBody = GetDirectionAngle(rootJointDirection) - bodyRotation;
@@ -305,6 +322,10 @@ public abstract class Limb : MonoBehaviour
     {
         float angleError = Mathf.DeltaAngle(joint.jointAngle, targetAngle);
         float desiredJointSpeed = 0f;
+
+        // 목표 각도에서 충분히 멀 때만 모터 구동
+        // (angleError * _angleSpeed) => 목표에서 멀수록 빠르게 움직이고,
+        // - (joint.jointSpeed * _motorDamping) => 관절이 이미 매우 빠르게 움직이고 있다면 목표 속도를 낮춘다 (관성으로 인해 목표를 지나치는 것을 방지)
         if (Mathf.Abs(angleError) > _stopAngle)
             desiredJointSpeed = (angleError * _angleSpeed) - (joint.jointSpeed * _motorDamping);
 
@@ -336,6 +357,12 @@ public abstract class Limb : MonoBehaviour
         joint.useMotor = enabled;
     }
 
+    /// <summary>
+    /// 계산된 목표 관절 각도가 HingeJoint2D의 허용 범위를 벗어나지 않도록 제한합니다.
+    /// </summary>
+    /// <param name="joint">관절</param>
+    /// <param name="angle">목표 관절 각도</param>
+    /// <returns></returns>
     protected static float ClampToJointLimits(HingeJoint2D joint, float angle)
     {
         if (joint.useLimits == false)
@@ -345,6 +372,11 @@ public abstract class Limb : MonoBehaviour
         return Mathf.Clamp(angle, limits.min, limits.max);
     }
 
+    /// <summary>
+    /// 벡터를 각도로 변환합니다.
+    /// </summary>
+    /// <param name="direction"></param>
+    /// <returns></returns>
     protected static float GetDirectionAngle(Vector2 direction)
     {
         return Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
