@@ -12,42 +12,72 @@ public enum LimbType
 public abstract class Limb : MonoBehaviour
 {
     protected LimbType _type;
-
     protected Robot _body;
 
     #region 어깨/골반 & 팔꿈치/무릎
     protected Rigidbody2D _upper;
     protected Rigidbody2D _lower;
+
+    // 관절
+    /// <summary>
+    /// 어깨/골반 관절
+    /// </summary>
     protected HingeJoint2D _rootJoint;
+    /// <summary>
+    /// 팔꿈치/무릎 관절
+    /// </summary>
     protected HingeJoint2D _midJoint;
 
     // 길이
     protected float _upperLength;
     protected float _lowerLength;
 
-    // 각도
+    // 초기 각도
+    protected float _initialRootJointAngle;
+    protected float _initialMidJointAngle;
+    // 목표 각도
     protected float _targetRootJointAngle;
     protected float _targetMidJointAngle;
 
+    // 목표 위치
     protected Vector2 _midJointPosition;
+
     protected int _midJointDirection;
-    [SerializeField, Range(-1, 1)] protected int _defalutMidJointDirection = 1;
+    /// <summary>
+    /// // 일직선일 때 사용할 기본 팔꿈치/무릎 방향 (->)
+    /// </summary>
+    protected int _defalutMidJointDirection = 1;
+
+    /// <summary>
+    /// 좌우 반전된 팔/다리에서 화면 방향과 관절 각도 방향을 맞추는 값
+    /// </summary>
+    protected float _jointAngleToVisibleAngleSign = 1f;
+    /// <summary>
+    /// 몸통을 기준으로 본 윗팔/허벅지 방향
+    /// </summary>
+    protected float _initialRootJointAngleFromBody;
+    /// <summary>
+    /// 윗팔/허벅지와 아랫팔/종아리 사이의 굽힘 각도
+    /// </summary>
+    protected float _initialMidJointBendAngle;
     #endregion
 
+    #region 손/발
     /// <summary>
     /// 손/발의 중심점
     /// </summary>
     protected Transform _endEffector;
     protected Collider2D _endEffectorCollider;
     protected Vector2 _endEffectorPosition;
+    #endregion
+
+    /// <summary>
+    /// 어깨/골반 ~ 손/발 길이
+    /// </summary>
+    protected float _maxReach;
 
     protected bool _followsMouse = false;
     protected Cursor _cursor;
-
-    /// <summary>
-    /// 어깨/골반 ~ 손/발 거리를 팔/다리가 닿을 수 있는 최대 길이
-    /// </summary>
-    protected float _maxReach;
 
     [Header("팔/다리를 완전히 펴지 않도록 남기는 여유")]
     [SerializeField, Range(0.8f, 0.999f)] protected float _maxReachRatio = 0.97f;
@@ -59,13 +89,6 @@ public abstract class Limb : MonoBehaviour
     [SerializeField, Min(0f)] protected float _maxMotorSpeed = 1080f;           // 관절이 회전할 수 있는 최대 목표 속도
     [SerializeField, Range(0f, 1f)] protected float _motorDamping = 0.7f;       // 현재 회전 속도를 이용해 지나치게 빠른 움직임과 떨림을 줄이는 값
     [SerializeField, Min(0f)] protected float _stopAngle = 0.35f;               // 남은 각도가 이 값보다 작으면 모터를 정지
-
-    // 자세 초기화
-    protected float _jointAngleToVisibleAngleSign = 1f;
-    protected float _initialRootJointAngle;
-    protected float _initialMidJointAngle;
-    protected float _initialRootJointAngleFromBody;
-    protected float _initialMidJointBendAngle;
 
     private void Awake()
     {
@@ -123,20 +146,24 @@ public abstract class Limb : MonoBehaviour
         StartJointMotor();
     }
 
+    /// <summary>
+    /// 관절 모터 작동을 준비하고 활성화합니다.
+    /// </summary>
     protected void StartJointMotor()
     {
-        Vector2 upperDirection = _lower.position - (Vector2)transform.position;
-        Vector2 lowerDirection = (Vector2)_endEffector.position - _lower.position;
-        float connectedBodyRotation = _rootJoint.connectedBody.rotation;
+        Vector2 rootJointDirection = _lower.position - (Vector2)transform.position;
+        Vector2 midJointDirection = (Vector2)_endEffector.position - _lower.position;
+        float bodyRotation = _rootJoint.connectedBody.rotation;
 
         _initialRootJointAngle = _rootJoint.jointAngle;
         _initialMidJointAngle = _midJoint.jointAngle;
-        _initialRootJointAngleFromBody = GetDirectionAngle(upperDirection) - connectedBodyRotation;
-        _initialMidJointBendAngle = Vector2.SignedAngle(upperDirection, lowerDirection);
+        _initialRootJointAngleFromBody = GetDirectionAngle(rootJointDirection) - bodyRotation;
+        _initialMidJointBendAngle = Vector2.SignedAngle(rootJointDirection, midJointDirection);
 
         Vector3 scale = transform.lossyScale;
         _jointAngleToVisibleAngleSign = scale.x * scale.y < 0f ? -1f : 1f;
 
+        // 활성화
         SetJointMotorEnabled(_rootJoint, true);
         SetJointMotorEnabled(_midJoint, true);
     }
@@ -157,7 +184,7 @@ public abstract class Limb : MonoBehaviour
     }
 
     /// <summary>
-    /// 마우스를 따라 팔/다리를 움직입니다.
+    /// 마우스를 따라 손/발 및 팔꿈치/무릎 위치를 업데이트합니다.
     /// </summary>
     protected void UpdateTarget()
     {
@@ -287,7 +314,6 @@ public abstract class Limb : MonoBehaviour
         JointMotor2D motor = joint.motor;
         motor.motorSpeed = desiredJointSpeed;
         motor.maxMotorTorque = maxMotorTorque;
-
         joint.motor = motor;
         joint.useMotor = true;
     }
